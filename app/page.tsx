@@ -1,49 +1,31 @@
-"use client"
+// app/page.tsx
+import Navbar from './components/Navbar';
+import ScoreCard from './components/ScoreCard';
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { EntryPage } from "@/components/entry-page"
-import { Dashboard } from "@/components/dashboard"
-
-export default function HomePage() {
-  const [walletAddress, setWalletAddress] = useState<string>("")
-  const [isConnected, setIsConnected] = useState(false)
-
-  const handleConnect = (address: string) => {
-    setWalletAddress(address)
-    setIsConnected(true)
-  }
-
-  const handleDisconnect = () => {
-    setIsConnected(false)
-    setWalletAddress("")
-  }
-
+export default function Home() {
   return (
-    <div className="min-h-screen bg-background">
-      <AnimatePresence mode="wait">
-        {!isConnected ? (
-          <motion.div
-            key="entry"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <EntryPage onConnect={handleConnect} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
-          >
-            <Dashboard walletAddress={walletAddress} onDisconnect={handleDisconnect} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+    <main className="min-h-screen bg-[#0d1117] text-white">
+      <Navbar />
+      
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* قسم التقييم */}
+          <div className="lg:col-span-1">
+            <ScoreCard score={75} status="TRUSTED" />
+          </div>
+
+          {/* قسم الإحصائيات (سنقوم ببنائه في الخطوة القادمة) */}
+          <div className="lg:col-span-2 bg-[#161b22] border border-gray-800 rounded-3xl p-8">
+            <h2 className="text-xl font-bold mb-4 text-blue-400">Activity Analysis</h2>
+            <div className="h-64 flex items-end gap-2">
+               {/* هنا سنضع الرسم البياني لاحقاً */}
+               <div className="w-full h-full border-b border-l border-gray-700 flex items-center justify-center text-gray-600 italic">
+                 Transaction Volume Graph (Coming Next...)
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
 }
