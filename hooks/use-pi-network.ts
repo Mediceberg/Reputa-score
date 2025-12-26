@@ -1,43 +1,43 @@
+// hooks/use-pi-network.ts
 export function usePiNetwork() {
   const createPayment = async (walletAddress: string) => {
+    // خطوة 1: التحقق من وجود المكتبة
     if (typeof window === "undefined" || !(window as any).Pi) {
-      console.error("Pi SDK not found. Please open in Pi Browser.");
+      alert("خطأ: لم يتم العثور على Pi SDK. تأكد أنك داخل Pi Browser");
       return null;
     }
 
     try {
-      // بدء عملية الدفع عبر Pi SDK
+      alert("بدء عملية الدفع..."); // إذا ظهر هذا، فالربط بالزر سليم
+
       const payment = await (window as any).Pi.createPayment({
         amount: 1,
-        memo: "Premium Verification Payment",
+        memo: "Test Payment",
         metadata: { walletAddress },
       }, {
-        // الموافقة على الدفع من خلال الـ API الخاص بك
         onReadyForServerApproval: async (paymentId: string) => {
-          await fetch('/api/pi/approve', {
+          alert("تمت الموافقة المبدئية. ID: " + paymentId);
+          // استدعاء الـ API الخاص بك
+          const res = await fetch('/api/pi/approve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
           });
+          if (!res.ok) alert("فشل الـ API في Approve: " + res.status);
         },
-        // إكمال عملية الدفع بعد نجاحها في البلوكشين
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          await fetch('/api/pi/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId, txid }),
-          });
+          alert("المرحلة النهائية. TXID: " + txid);
         },
-        onCancel: (paymentId: string) => console.log("Payment Cancelled", paymentId),
-        onError: (error: Error, paymentId?: string) => console.error("Payment Error", error),
+        onCancel: (paymentId: string) => alert("تم إلغاء الدفع من قبلك"),
+        onError: (error: Error, paymentId?: string) => {
+          // هذه أهم رسالة ستظهر لك سبب المشكلة الحقيقي
+          alert("خطأ من Pi SDK: " + error.message);
+        },
       });
-
       return payment;
-    } catch (e) {
-      console.error("Critical Payment Failure", e);
-      return null;
+    } catch (e: any) {
+      alert("خطأ برمجى (Catch): " + e.message);
     }
   };
-
   return { createPayment };
 }
