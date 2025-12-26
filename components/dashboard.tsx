@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -10,7 +9,7 @@ import { TrustScoreGauge } from "@/components/trust-score-gauge"
 import { TierCards } from "@/components/tier-cards"
 import { TransactionChart } from "@/components/transaction-chart"
 import { Sandbox } from "@/components/sandbox"
-import { LogOut, Settings, Search, Crown, Loader2, AlertCircle } from "lucide-react"
+import { LogOut, Settings, Search, Crown, Loader2, AlertCircle, CreditCard } from "lucide-react"
 import { calculateTrustScore, type MockData } from "@/lib/reputation-engine"
 import { usePiNetwork } from "@/hooks/use-pi-network"
 
@@ -18,9 +17,10 @@ interface DashboardProps {
   walletAddress: string
   username?: string
   onDisconnect: () => void
+  onPay?: () => void 
 }
 
-export function Dashboard({ walletAddress, username, onDisconnect }: DashboardProps) {
+export function Dashboard({ walletAddress, username, onDisconnect, onPay }: DashboardProps) {
   const [showSandbox, setShowSandbox] = useState(false)
   const [searchAddress, setSearchAddress] = useState("")
   const [isSearching, setIsSearching] = useState(false)
@@ -72,10 +72,8 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
 
   const handlePremiumVerification = async () => {
     setIsProcessingPayment(true)
-
     try {
       const paymentId = await createPayment(walletAddress)
-
       if (paymentId) {
         setIsPremium(true)
       }
@@ -88,6 +86,7 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
 
   return (
     <div className="min-h-screen p-4 pb-20 md:p-6">
+      {/* Header */}
       <motion.div
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -116,7 +115,18 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
             {walletAddress}
           </p>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-2">
+          {/* Pi Pay Button (Step 10) */}
+          <Button
+            variant="default"
+            onClick={onPay}
+            className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white shadow-lg border-none transition-all hover:scale-105 active:scale-95"
+          >
+            <CreditCard className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline font-bold">Pi Pay (Step 10)</span>
+          </Button>
+
           <Button
             variant="outline"
             size="icon"
@@ -125,6 +135,7 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
           >
             <Settings className="w-4 h-4" />
           </Button>
+
           <Button
             variant="outline"
             size="icon"
@@ -136,6 +147,7 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
         </div>
       </motion.div>
 
+      {/* Search Section */}
       <motion.div
         initial={{ y: -10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -170,9 +182,7 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-9 space-y-6">
-          {/* Trust Score Gauge */}
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -197,40 +207,23 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
                   <p className="text-sm text-muted-foreground mb-2">
                     Unlock verified status, priority support, and advanced analytics
                   </p>
-                  <div className="flex flex-wrap gap-2 justify-center md:justify-start text-xs">
-                    <span className="px-2 py-1 rounded-full bg-[var(--purple)]/20 text-[var(--purple)]">
-                      Enhanced Visibility
-                    </span>
-                    <span className="px-2 py-1 rounded-full bg-[var(--gold)]/20 text-[var(--gold)]">
-                      Priority Support
-                    </span>
-                    <span className="px-2 py-1 rounded-full bg-[var(--trusted)]/20 text-[var(--trusted)]">
-                      Advanced Analytics
-                    </span>
-                  </div>
                 </div>
                 <Button
                   onClick={handlePremiumVerification}
                   disabled={isProcessingPayment}
-                  className="bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] hover:opacity-90 font-semibold whitespace-nowrap h-12 px-6"
+                  className="bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] hover:opacity-90 font-semibold h-12 px-6"
                 >
                   {isProcessingPayment ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
-                    <>
-                      <Crown className="w-4 h-4 mr-2" />
-                      Verify for 1 Pi
-                    </>
+                    <Crown className="w-4 h-4 mr-2" />
                   )}
+                  {isProcessingPayment ? "Processing..." : "Verify for 1 Pi"}
                 </Button>
               </div>
             </motion.div>
           )}
 
-          {/* Tier Cards */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -239,7 +232,6 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
             <TierCards currentScore={trustScore} />
           </motion.div>
 
-          {/* Transaction Chart */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -249,13 +241,10 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
           </motion.div>
         </div>
 
-        {/* Sidebar - Sandbox */}
         {showSandbox && (
           <motion.div
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 20, opacity: 0 }}
-            transition={{ duration: 0.5 }}
             className="lg:col-span-3"
           >
             <Sandbox mockData={mockData} onDataChange={handleMockDataChange} />
@@ -265,4 +254,3 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
     </div>
   )
 }
-
