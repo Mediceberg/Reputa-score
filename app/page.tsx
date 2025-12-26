@@ -1,8 +1,9 @@
 "use client"; // ضروري لاستخدام مكتبة Pi SDK في المتصفح
 
 import { useEffect, useState } from 'react';
-import Navbar from '../components/Navbar';
-import ScoreCard from '../components/ScoreCard';
+import Navbar from './components/Navbar';
+import ScoreCard from './components/ScoreCard';
+
 // تعريف واجهة window لتجنب أخطاء TypeScript
 declare global {
   interface Window {
@@ -18,7 +19,7 @@ export default function Home() {
       if (typeof window !== "undefined" && window.Pi) {
         try {
           // 1. تهيئة التطبيق (ضروري لتجاوز الخطوة 6)
-          window.Pi.init({ version: "2.0", sandbox: false });
+          window.Pi.init({ version: "2.0", sandbox: true });
 
           // 2. طلب تسجيل الدخول (Authenticate) لربط حساب المستخدم
           const scopes = ['username', 'payments'];
@@ -69,3 +70,4 @@ export default function Home() {
     </main>
   );
 }
+
