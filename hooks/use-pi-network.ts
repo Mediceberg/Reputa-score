@@ -8,11 +8,14 @@ export function usePiNetwork() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
     const Pi = (window as any).Pi;
     if (!Pi) return;
 
+    // Initialize Pi SDK
     Pi.init({ version: "2.0" });
 
+    // Authenticate user
     Pi.authenticate(
       ["username", "payments"],
       (auth: any) => {
@@ -22,6 +25,7 @@ export function usePiNetwork() {
       },
       (err: any) => {
         console.error("Pi auth error:", err);
+        setReady(false);
       }
     );
   }, []);
