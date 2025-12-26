@@ -7,15 +7,16 @@ import { TrustScoreGauge } from "@/components/trust-score-gauge"
 import { TierCards } from "@/components/tier-cards"
 import { TransactionChart } from "@/components/transaction-chart"
 import { Sandbox } from "@/components/sandbox"
-import { LogOut, Settings } from "lucide-react"
+import { LogOut, Settings, CreditCard } from "lucide-react" // أضفنا CreditCard
 import { calculateTrustScore, type MockData } from "@/lib/reputation-engine"
 
 interface DashboardProps {
   walletAddress: string
   onDisconnect: () => void
+  onPay?: () => void // أضفنا خاصية الدفع هنا
 }
 
-export function Dashboard({ walletAddress, onDisconnect }: DashboardProps) {
+export function Dashboard({ walletAddress, onDisconnect, onPay }: DashboardProps) {
   const [showSandbox, setShowSandbox] = useState(false)
   const [mockData, setMockData] = useState<MockData>({
     volume: 500,
@@ -49,6 +50,16 @@ export function Dashboard({ walletAddress, onDisconnect }: DashboardProps) {
           <p className="text-xs text-muted-foreground truncate max-w-[200px] md:max-w-none">{walletAddress}</p>
         </div>
         <div className="flex gap-2">
+          {/* زر الدفع الجديد لإتمام الخطوة رقم 10 */}
+          <Button
+            variant="default"
+            onClick={onPay}
+            className="bg-gradient-to-r from-yellow-500 to-yellow-700 hover:from-yellow-600 hover:to-yellow-800 text-white shadow-lg border-none"
+          >
+            <CreditCard className="w-4 h-4 mr-2" />
+            <span className="hidden md:inline">Test Payment</span>
+          </Button>
+
           <Button
             variant="outline"
             size="icon"
@@ -68,10 +79,9 @@ export function Dashboard({ walletAddress, onDisconnect }: DashboardProps) {
         </div>
       </motion.div>
 
+      {/* باقي الكود كما هو دون تغيير لضمان عمل الـ Vercel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-9 space-y-6">
-          {/* Trust Score Gauge */}
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -80,7 +90,6 @@ export function Dashboard({ walletAddress, onDisconnect }: DashboardProps) {
             <TrustScoreGauge score={trustScore} />
           </motion.div>
 
-          {/* Tier Cards */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -89,7 +98,6 @@ export function Dashboard({ walletAddress, onDisconnect }: DashboardProps) {
             <TierCards currentScore={trustScore} />
           </motion.div>
 
-          {/* Transaction Chart */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -99,7 +107,6 @@ export function Dashboard({ walletAddress, onDisconnect }: DashboardProps) {
           </motion.div>
         </div>
 
-        {/* Sidebar - Sandbox */}
         {showSandbox && (
           <motion.div
             initial={{ x: 20, opacity: 0 }}
