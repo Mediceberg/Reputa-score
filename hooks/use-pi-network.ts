@@ -1,20 +1,32 @@
 export function usePiNetwork() {
   const createPayment = async (walletAddress: string) => {
     const Pi = (window as any).Pi;
-    if (!Pi) return null;
+    
+    // التحقق من وجود المكتبة
+    if (!Pi) {
+      alert("الرجاء فتح التطبيق من داخل متصفح Pi Browser");
+      return null;
+    }
 
     try {
-      const auth = await Pi.authenticate(['payments', 'username'], (payment: any) => {
+      // 1. التوثيق وطلب الصلاحيات (Scopes)
+      // يجب استدعاء authenticate قبل أي عملية دفع
+      const scopes = ['payments', 'username']; 
+      
+      const auth = await Pi.authenticate(scopes, (payment: any) => {
+        // معالجة المدفوعات غير المكتملة
         console.log("Incomplete payment found:", payment);
       });
 
-      alert("تم التوثيق بنجاح للمستخدم: " + auth.user.username);
+      console.log(`Hi ${auth.user.username}, ready for payment!`);
 
+      // 2. إنشاء عملية الدفع (User-To-App)
       const payment = await Pi.createPayment({
         amount: 1,
         memo: "Premium Verification Payment",
         metadata: { walletAddress },
       }, {
+        // يتم استدعاؤها عندما يكون الدفع جاهزاً للموافقة من السيرفر
         onReadyForServerApproval: async (paymentId: string) => {
           await fetch('/api/pi/approve', {
             method: 'POST',
@@ -22,6 +34,7 @@ export function usePiNetwork() {
             body: JSON.stringify({ paymentId }),
           });
         },
+        // يتم استدعاؤها بعد اكتمال المعاملة على البلوكشين
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
           await fetch('/api/pi/complete', {
             method: 'POST',
@@ -29,13 +42,17 @@ export function usePiNetwork() {
             body: JSON.stringify({ paymentId, txid }),
           });
         },
-        onCancel: (paymentId: string) => alert("تم إلغاء العملية"),
-        onError: (error: Error) => alert("خطأ: " + error.message),
+        onCancel: (paymentId: string) => {
+          console.log("Payment cancelled:", paymentId);
+        },
+        onError: (error: Error, payment?: any) => {
+          alert("حدث خطأ أثناء الدفع: " + error.message);
+        },
       });
 
       return payment;
     } catch (e: any) {
-      alert("خطأ في التوثيق أو الدفع: " + e.message);
+      alert("فشل التوثيق: " + e.message);
       return null;
     }
   };
