@@ -6,9 +6,8 @@ import Script from "next/script"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Made with App Studio",
+  title: "Reputa Score",
   description: "Pi Network Reputation Score Terminal",
-    generator: 'v0.app'
 }
 
 export default function RootLayout({
@@ -19,17 +18,29 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script src="https://sdk.minepi.com/pi-sdk.js" strategy="beforeInteractive" />
+        {/* تحميل المكتبة قبل التفاعل مع الصفحة */}
+        <Script 
+          src="https://sdk.minepi.com/pi-sdk.js" 
+          strategy="beforeInteractive" 
+        />
+        {/* تفعيل المكتبة في وضع التجربة sandbox */}
+        <Script id="pi-sdk-init" strategy="afterInteractive">
+          {`
+            if (window.Pi) {
+              window.Pi.init({ version: "2.0", sandbox: true });
+              console.log("Pi SDK Initialized with Sandbox Mode");
+            }
+          `}
+        </Script>
         <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
+          html {
+            font-family: ${GeistSans.style.fontFamily};
+            --font-sans: ${GeistSans.variable};
+            --font-mono: ${GeistMono.variable};
+          }
         `}</style>
       </head>
       <body>{children}</body>
     </html>
   )
 }
-
