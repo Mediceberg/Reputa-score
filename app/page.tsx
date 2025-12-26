@@ -19,7 +19,7 @@ export default function Home() {
       if (typeof window !== "undefined" && window.Pi) {
         try {
           // 1. تهيئة التطبيق (ضروري لتجاوز الخطوة 6)
-          window.Pi.init({ version: "2.0", sandbox: true });
+          window.Pi.init({ version: "2.0", sandbox: false });
 
           // 2. طلب تسجيل الدخول (Authenticate) لربط حساب المستخدم
           const scopes = ['username', 'payments'];
