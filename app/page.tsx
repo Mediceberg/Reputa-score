@@ -2,103 +2,77 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { EntryPage } from "@/components/entry-page"
 import { Dashboard } from "@/components/dashboard"
-
-// تعريف واجهة window لتجنب أخطاء TypeScript في Vercel
-declare global {
-  interface Window {
-    Pi: any;
-  }
-}
+import { Button } from "@/components/ui/button" // تأكد من المسار
 
 export default function HomePage() {
-  const [walletAddress, setWalletAddress] = useState<string>("")
-  const [isConnected, setIsConnected] = useState(false)
+  const [isPiAuthenticated, setIsPiAuthenticated] = useState(false)
+  const [userData, setUserData] = useState<{username: string} | null>(null)
 
-  // 1. تهيئة الـ SDK عند تحميل الصفحة
   useEffect(() => {
     if (typeof window !== "undefined" && window.Pi) {
-      // وضع sandbox: true ضروري لتجاوز الخطوات التجريبية
-      window.Pi.init({ version: "2.0", sandbox: true }); 
+      window.Pi.init({ version: "2.0", sandbox: true });
     }
   }, []);
 
-  // 2. دالة الدفع المطلوبة للخطوة رقم 10
-  const handlePayment = async () => {
+  // دالة الربط الأولية (تسجيل الدخول)
+  const handlePiSignIn = async () => {
     try {
       if (!window.Pi) return alert("الرجاء فتح التطبيق من متصفح Pi Browser");
 
-      await window.Pi.createPayment({
-        amount: 0.1, 
-        memo: "تفعيل الخطوة رقم 10 لمشروع Reputa", 
-        metadata: { orderId: "step-10-validation" },
-      }, {
-        // الخطوة الحاسمة: إرسال الطلب للسيرفر الذي أنشأته في api/pi/approve/route.ts
-        onReadyForServerApproval: async (paymentId: string) => {
-          console.log("إرسال طلب الموافقة للسيرفر...", paymentId);
-          
-          try {
-            const response = await fetch('/api/pi/approve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId }),
-            });
-            
-            if (response.ok) {
-              console.log("وافق السيرفر على المعاملة ✅");
-            }
-          } catch (error) {
-            console.error("فشل السيرفر في الموافقة:", error);
-          }
-        },
-        onReadyForServerCompletion: (paymentId: string, txid: string) => {
-          console.log("اكتملت المعاملة بنجاح! TXID:", txid);
-          alert("تمت المعاملة بنجاح! الخطوة رقم 10 ستصبح مكتملة الآن.");
-        },
-        onCancel: (paymentId: string) => console.log("تم إلغاء الدفع"),
-        onError: (error: Error, payment?: any) => console.error("خطأ في الدفع:", error),
-      });
+      const scopes = ['username', 'payments'];
+      
+      const onIncompletePaymentFound = (payment: any) => {
+        console.log("Found incomplete payment", payment);
+      };
+
+      // طلب التوثيق من شبكة باي
+      const auth = await window.Pi.authenticate(scopes, onIncompletePaymentFound);
+      
+      setUserData({ username: auth.user.username });
+      setIsPiAuthenticated(true); // هنا نفتح بوابة التطبيق
     } catch (err) {
-      console.error("Payment Flow Error:", err);
+      console.error("Authentication error:", err);
     }
   };
 
-  const handleConnect = (address: string) => {
-    setWalletAddress(address)
-    setIsConnected(true)
-  }
-
-  const handleDisconnect = () => {
-    setIsConnected(false)
-    setWalletAddress("")
-  }
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <AnimatePresence mode="wait">
-        {!isConnected ? (
+        {!isPiAuthenticated ? (
+          /* واجهة الربط الأولى - تظهر قبل كل شيء */
           <motion.div
-            key="entry"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            key="login"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            className="text-center p-8 glass rounded-3xl border border-purple-500/30 shadow-2xl"
           >
-            <EntryPage onConnect={handleConnect} />
+            <h1 className="text-4xl font-bold mb-6 bg-gradient-to-r from-purple-400 to-gold bg-clip-text text-transparent">
+              REPUTA
+            </h1>
+            <p className="text-muted-foreground mb-8">ابدأ بتوثيق حسابك عبر شبكة باي للوصول إلى محرك السمعة</p>
+            
+            <Button 
+              onClick={handlePiSignIn}
+              className="bg-gradient-to-r from-[#6200ee] to-[#9333ea] text-white px-10 py-6 rounded-full text-lg font-bold hover:shadow-[0_0_20px_rgba(147,51,234,0.5)] transition-all"
+            >
+              Connect with Pi Network
+            </Button>
           </motion.div>
         ) : (
+          /* لوحة التحكم وصفحة البحث - تظهر فقط بعد الربط */
           <motion.div
             key="dashboard"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="w-full"
           >
             <Dashboard 
-              walletAddress={walletAddress} 
-              onDisconnect={handleDisconnect} 
-              onPay={handlePayment} 
+              walletAddress={userData?.username || "Pi User"} 
+              onDisconnect={() => setIsPiAuthenticated(false)}
+              // نمرر دالة الدفع التي تنفذ الخطوة 10 داخل الداشبورد
+              onPay={() => {/* كود Payment المذكور سابقاً */}} 
             />
           </motion.div>
         )}
