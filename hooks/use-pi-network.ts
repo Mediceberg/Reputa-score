@@ -6,17 +6,15 @@ export function usePiNetwork() {
       const Pi = (window as any).Pi;
       if (!Pi) return reject("Pi SDK not found");
 
+      // Authenticate user
       Pi.authenticate(
         ["username", "payments"],
         (auth: any) => {
-          console.log("Authenticated:", auth);
+          console.log("Authenticated user:", auth);
 
+          // Create Payment
           Pi.createPayment(
-            {
-              amount: 1,
-              memo: "Premium Verification",
-              metadata: { walletAddress },
-            },
+            { amount: 1, memo: "Premium Verification", metadata: { walletAddress } },
             {
               onReadyForServerApproval: async (paymentId: string) => {
                 await fetch("/api/pi/approve", {
