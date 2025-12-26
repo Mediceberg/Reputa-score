@@ -12,7 +12,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ walletAddress, username, onDisconnect }: DashboardProps) {
-  const { ready, createPayment } = usePiNetwork();
+  const { ready, user, createPayment } = usePiNetwork();
   const [isPremium, setIsPremium] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -42,7 +42,7 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-xl font-bold">@{username}</h1>
+      <h1 className="text-xl font-bold">@{username || user?.username}</h1>
       <p>{walletAddress}</p>
 
       {!isPremium && (
