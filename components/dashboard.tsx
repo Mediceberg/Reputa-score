@@ -7,13 +7,13 @@ import { TrustScoreGauge } from "@/components/trust-score-gauge"
 import { TierCards } from "@/components/tier-cards"
 import { TransactionChart } from "@/components/transaction-chart"
 import { Sandbox } from "@/components/sandbox"
-import { LogOut, Settings, CreditCard } from "lucide-react" // أضفنا CreditCard
+import { LogOut, Settings, CreditCard } from "lucide-react" 
 import { calculateTrustScore, type MockData } from "@/lib/reputation-engine"
 
 interface DashboardProps {
   walletAddress: string
   onDisconnect: () => void
-  onPay?: () => void // أضفنا خاصية الدفع هنا
+  onPay?: () => void 
 }
 
 export function Dashboard({ walletAddress, onDisconnect, onPay }: DashboardProps) {
@@ -49,15 +49,16 @@ export function Dashboard({ walletAddress, onDisconnect, onPay }: DashboardProps
           </h1>
           <p className="text-xs text-muted-foreground truncate max-w-[200px] md:max-w-none">{walletAddress}</p>
         </div>
-        <div className="flex gap-2">
-          {/* زر الدفع الجديد لإتمام الخطوة رقم 10 */}
+        
+        <div className="flex items-center gap-2">
+          {/* زر الدفع لتفعيل الخطوة رقم 10 - يظهر بشكل بارز */}
           <Button
             variant="default"
             onClick={onPay}
-            className="bg-gradient-to-r from-yellow-500 to-yellow-700 hover:from-yellow-600 hover:to-yellow-800 text-white shadow-lg border-none"
+            className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white shadow-lg border-none transition-all hover:scale-105 active:scale-95"
           >
-            <CreditCard className="w-4 h-4 mr-2" />
-            <span className="hidden md:inline">Test Payment</span>
+            <CreditCard className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline font-bold">Pi Pay (Step 10)</span>
           </Button>
 
           <Button
@@ -66,20 +67,21 @@ export function Dashboard({ walletAddress, onDisconnect, onPay }: DashboardProps
             onClick={() => setShowSandbox(!showSandbox)}
             className="glass border-border/50"
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-4 h-4 text-muted-foreground" />
           </Button>
+          
           <Button
             variant="outline"
             size="icon"
             onClick={onDisconnect}
-            className="glass border-border/50 bg-transparent"
+            className="glass border-border/50 bg-transparent hover:bg-red-500/10"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 text-red-400" />
           </Button>
         </div>
       </motion.div>
 
-      {/* باقي الكود كما هو دون تغيير لضمان عمل الـ Vercel */}
+      {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-9 space-y-6">
           <motion.div
