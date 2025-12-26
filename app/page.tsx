@@ -19,30 +19,45 @@ export default function HomePage() {
   // 1. تهيئة الـ SDK عند تحميل الصفحة
   useEffect(() => {
     if (typeof window !== "undefined" && window.Pi) {
-      window.Pi.init({ version: "2.0", sandbox: true }); // اجعلها true للخطوة 10
+      // وضع sandbox: true ضروري لتجاوز الخطوات التجريبية
+      window.Pi.init({ version: "2.0", sandbox: true }); 
     }
   }, []);
 
   // 2. دالة الدفع المطلوبة للخطوة رقم 10
   const handlePayment = async () => {
     try {
-      if (!window.Pi) return alert("الرجاء فتح التطبيق من متصفح Pi");
+      if (!window.Pi) return alert("الرجاء فتح التطبيق من متصفح Pi Browser");
 
-      const payment = await window.Pi.createPayment({
-        amount: 0.1, // مبلغ تجريبي صغير
-        memo: "Test payment for Step 10", 
+      await window.Pi.createPayment({
+        amount: 0.1, 
+        memo: "تفعيل الخطوة رقم 10 لمشروع Reputa", 
         metadata: { orderId: "step-10-validation" },
       }, {
-        onReadyForServerApproval: (paymentId: string) => {
-          console.log("Payment Ready for Approval:", paymentId);
-          // في تطبيقات التجربة، الشبكة توافق تلقائياً أحياناً في الـ Sandbox
+        // الخطوة الحاسمة: إرسال الطلب للسيرفر الذي أنشأته في api/pi/approve/route.ts
+        onReadyForServerApproval: async (paymentId: string) => {
+          console.log("إرسال طلب الموافقة للسيرفر...", paymentId);
+          
+          try {
+            const response = await fetch('/api/pi/approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId }),
+            });
+            
+            if (response.ok) {
+              console.log("وافق السيرفر على المعاملة ✅");
+            }
+          } catch (error) {
+            console.error("فشل السيرفر في الموافقة:", error);
+          }
         },
         onReadyForServerCompletion: (paymentId: string, txid: string) => {
-          console.log("Payment Completed! TXID:", txid);
-          alert("تمت المعاملة بنجاح! انتقل الآن إلى بوابة المطورين");
+          console.log("اكتملت المعاملة بنجاح! TXID:", txid);
+          alert("تمت المعاملة بنجاح! الخطوة رقم 10 ستصبح مكتملة الآن.");
         },
-        onCancel: (paymentId: string) => console.log("Payment Cancelled"),
-        onError: (error: Error, payment?: any) => console.error("Payment Error", error),
+        onCancel: (paymentId: string) => console.log("تم إلغاء الدفع"),
+        onError: (error: Error, payment?: any) => console.error("خطأ في الدفع:", error),
       });
     } catch (err) {
       console.error("Payment Flow Error:", err);
@@ -80,7 +95,6 @@ export default function HomePage() {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
           >
-            {/* أضفنا دالة handlePayment هنا ليتمكن المستخدم من الضغط على زر الدفع داخل الداشبورد */}
             <Dashboard 
               walletAddress={walletAddress} 
               onDisconnect={handleDisconnect} 
