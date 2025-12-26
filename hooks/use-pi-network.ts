@@ -2,31 +2,27 @@ export function usePiNetwork() {
   const createPayment = async (walletAddress: string) => {
     const Pi = (window as any).Pi;
     
-    // التحقق من وجود المكتبة
-    if (!Pi) {
-      alert("الرجاء فتح التطبيق من داخل متصفح Pi Browser");
+    if (typeof window === "undefined" || !Pi) {
+      console.error("Pi SDK not found. Please open in Pi Browser.");
       return null;
     }
 
     try {
-      // 1. التوثيق وطلب الصلاحيات (Scopes)
-      // يجب استدعاء authenticate قبل أي عملية دفع
-      const scopes = ['payments', 'username']; 
-      
+      // 1. طلب التوثيق وصلاحية المدفوعات (هذا الجزء المفقود في كودك الحالي)
+      const scopes = ['payments', 'username'];
       const auth = await Pi.authenticate(scopes, (payment: any) => {
-        // معالجة المدفوعات غير المكتملة
         console.log("Incomplete payment found:", payment);
       });
 
-      console.log(`Hi ${auth.user.username}, ready for payment!`);
+      alert("تم التوثيق بنجاح للمستخدم: " + auth.user.username);
 
-      // 2. إنشاء عملية الدفع (User-To-App)
+      // 2. بدء عملية الدفع عبر Pi SDK
       const payment = await Pi.createPayment({
         amount: 1,
         memo: "Premium Verification Payment",
         metadata: { walletAddress },
       }, {
-        // يتم استدعاؤها عندما يكون الدفع جاهزاً للموافقة من السيرفر
+        // الـ API الخاص بك للموافقة على الدفع
         onReadyForServerApproval: async (paymentId: string) => {
           await fetch('/api/pi/approve', {
             method: 'POST',
@@ -34,7 +30,7 @@ export function usePiNetwork() {
             body: JSON.stringify({ paymentId }),
           });
         },
-        // يتم استدعاؤها بعد اكتمال المعاملة على البلوكشين
+        // الـ API الخاص بك لإكمال عملية الدفع
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
           await fetch('/api/pi/complete', {
             method: 'POST',
@@ -42,17 +38,13 @@ export function usePiNetwork() {
             body: JSON.stringify({ paymentId, txid }),
           });
         },
-        onCancel: (paymentId: string) => {
-          console.log("Payment cancelled:", paymentId);
-        },
-        onError: (error: Error, payment?: any) => {
-          alert("حدث خطأ أثناء الدفع: " + error.message);
-        },
+        onCancel: (paymentId: string) => alert("تم إلغاء عملية الدفع"),
+        onError: (error: Error) => alert("خطأ في الدفع: " + error.message),
       });
 
       return payment;
     } catch (e: any) {
-      alert("فشل التوثيق: " + e.message);
+      alert("خطأ في التوثيق أو الدفع: " + e.message);
       return null;
     }
   };
