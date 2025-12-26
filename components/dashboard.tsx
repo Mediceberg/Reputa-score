@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Crown, Loader2, CreditCard } from "lucide-react";
+import { Crown, Loader2 } from "lucide-react";
 import { usePiNetwork } from "@/hooks/use-pi-network";
 
 interface DashboardProps {
@@ -12,7 +12,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ walletAddress, username, onDisconnect }: DashboardProps) {
-  const { createPayment } = usePiNetwork();
+  const { ready, createPayment } = usePiNetwork();
   const [isPremium, setIsPremium] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -28,6 +28,17 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
       setIsProcessingPayment(false);
     }
   };
+
+  // Conditional rendering إذا Pi SDK ما جاهزش
+  if (!ready) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-red-500 text-center">
+          ❌ Please open this app in Pi Browser to use Dashboard
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-4">
