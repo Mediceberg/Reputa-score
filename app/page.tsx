@@ -1,8 +1,8 @@
 "use client"; // ضروري لاستخدام مكتبة Pi SDK في المتصفح
 
 import { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
-import ScoreCard from './components/ScoreCard';
+import Navbar from '@/components/Navbar';
+import ScoreCard from '@/components/ScoreCard';
 
 // تعريف واجهة window لتجنب أخطاء TypeScript
 declare global {
