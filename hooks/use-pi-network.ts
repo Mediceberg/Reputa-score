@@ -1,68 +1,44 @@
-"use client";
-
-import { useState, useEffect } from "react";
-
 export function usePiNetwork() {
-  const [ready, setReady] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
+  const createPayment = async (walletAddress: string) => {
     const Pi = (window as any).Pi;
-    if (!Pi) return;
+    if (!Pi) return null;
 
-    // Initialize Pi SDK
-    Pi.init({ version: "2.0" });
+    try {
+      const auth = await Pi.authenticate(['payments', 'username'], (payment: any) => {
+        console.log("Incomplete payment found:", payment);
+      });
 
-    // Authenticate user
-    Pi.authenticate(
-      ["username", "payments"],
-      (auth: any) => {
-        console.log("Authenticated:", auth);
-        setUser(auth);
-        setReady(true);
-      },
-      (err: any) => {
-        console.error("Pi auth error:", err);
-        setReady(false);
-      }
-    );
-  }, []);
+      alert("تم التوثيق بنجاح للمستخدم: " + auth.user.username);
 
-  const createPayment = (walletAddress: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const Pi = (window as any).Pi;
-      if (!Pi) return reject("Pi SDK not found");
-
-      Pi.createPayment(
-        {
-          amount: 1,
-          memo: "Premium Verification",
-          metadata: { walletAddress },
+      const payment = await Pi.createPayment({
+        amount: 1,
+        memo: "Premium Verification Payment",
+        metadata: { walletAddress },
+      }, {
+        onReadyForServerApproval: async (paymentId: string) => {
+          await fetch('/api/pi/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId }),
+          });
         },
-        {
-          onReadyForServerApproval: async (paymentId: string) => {
-            await fetch("/api/pi/approve", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ paymentId }),
-            });
-          },
-          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-            await fetch("/api/pi/approve", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ paymentId, txid }),
-            });
-            resolve(paymentId);
-          },
-          onCancel: () => reject("Payment cancelled"),
-          onError: (err: any) => reject(err),
-        }
-      );
-    });
+        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+          await fetch('/api/pi/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId, txid }),
+          });
+        },
+        onCancel: (paymentId: string) => alert("تم إلغاء العملية"),
+        onError: (error: Error) => alert("خطأ: " + error.message),
+      });
+
+      return payment;
+    } catch (e: any) {
+      alert("خطأ في التوثيق أو الدفع: " + e.message);
+      return null;
+    }
   };
 
-  return { ready, user, createPayment };
+  return { createPayment };
 }
