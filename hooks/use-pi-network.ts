@@ -1,32 +1,35 @@
 // hooks/use-pi-network.ts
-import { useState } from 'react';
-
 export function usePiNetwork() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const createPayment = async (walletAddress: string) => {
-    setLoading(true);
-    setError(null);
-    
     try {
-      console.log("Starting Pi payment for wallet:", walletAddress);
-      
-      // هنا يتم عادة الربط مع Pi SDK 
-      // سنضع محاكاة (Simulation) لنجاح العملية
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          console.log("Payment successful");
-          resolve("payment_id_example_123");
-        }, 2000);
+      // 1. طلب إنشاء دفع من الـ Backend الخاص بك
+      const response = await fetch('http://localhost:8000/payments', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress, amount: 1, memo: "Premium Verification" })
       });
-    } catch (err) {
-      setError("Payment failed");
+
+      const paymentData = await response.json();
+
+      // 2. هنا يجب استدعاء Pi SDK الفعلي في المتصفح
+      // @ts-ignore
+      const payment = await window.Pi.createPayment({
+        amount: 1,
+        memo: "Verify Premium Status",
+        metadata: { paymentId: paymentData.id },
+      }, {
+        onReadyForServerApproval: (paymentId: string) => { /* إرسال للموافقة */ },
+        onReadyForServerCompletion: (paymentId: string, txid: string) => { /* إرسال للإتمام */ },
+        onCancel: (paymentId: string) => { console.log("Cancelled"); },
+        onError: (error: Error, paymentId?: string) => { console.error(error); },
+      });
+
+      return paymentData.id;
+    } catch (error) {
+      console.error("Payment Error:", error);
       return null;
-    } finally {
-      setLoading(false);
     }
   };
 
-  return { createPayment, loading, error };
+  return { createPayment };
 }
