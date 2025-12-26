@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   // ستحتاج لـ API Key الخاص بك من بوابة المطورين
   const response = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
     method: 'POST',
-    headers: { 'Authorization': `Key YOUR_API_KEY_HERE` }
+    headers: { 'Authorization': `dd4knvcjpvcycmxnxw8mjmcpovbvjjizrdbjcupasgu6crwlcpp1k65dmalcegzk` }
   });
 
   return NextResponse.json({ success: true });
