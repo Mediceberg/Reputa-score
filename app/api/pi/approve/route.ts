@@ -7,13 +7,10 @@ export async function POST(req: Request) {
 
     if (!apiKey) return NextResponse.json({ error: "PI_API_KEY not set" }, { status: 500 });
 
-    // Approve Payment
+    // Approve
     const approveRes = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
       method: "POST",
-      headers: {
-        Authorization: `Key ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Key ${apiKey}`, "Content-Type": "application/json" },
     });
 
     if (!approveRes.ok) {
@@ -21,14 +18,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Approve failed", details: err }, { status: 400 });
     }
 
-    // Complete Payment (if txid exists)
+    // Complete
     if (txid) {
       const completeRes = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/complete`, {
         method: "POST",
-        headers: {
-          Authorization: `Key ${apiKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Key ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ txid }),
       });
 
