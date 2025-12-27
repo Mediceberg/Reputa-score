@@ -2,29 +2,39 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { paymentId } = await req.json();
-    const apiKey = process.env.PI_API_KEY; // تأكد من إضافة هذا في Vercel Settings
+    const { paymentId, txid } = await req.json();
+    const apiKey = process.env.PI_API_KEY;
 
-    if (!apiKey) {
-      return NextResponse.json({ error: "PI_API_KEY is missing" }, { status: 500 });
-    }
+    if (!apiKey) return NextResponse.json({ error: "PI_API_KEY not set" }, { status: 500 });
 
-    // استدعاء خادم Pi للموافقة على الدفع
-    const response = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
+    // Approve
+    const approveRes = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
       method: "POST",
-      headers: {
-        "Authorization": `Key ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Key ${apiKey}`, "Content-Type": "application/json" },
     });
 
-    if (!response.ok) {
-      const errorDetail = await response.text();
-      return NextResponse.json({ error: "Pi API Error", detail: errorDetail }, { status: 400 });
+    if (!approveRes.ok) {
+      const err = await approveRes.text();
+      return NextResponse.json({ error: "Approve failed", details: err }, { status: 400 });
+    }
+
+    // Complete
+    if (txid) {
+      const completeRes = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/complete`, {
+        method: "POST",
+        headers: { Authorization: `Key ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ txid }),
+      });
+
+      if (!completeRes.ok) {
+        const err = await completeRes.text();
+        return NextResponse.json({ error: "Complete failed", details: err }, { status: 400 });
+      }
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error) {
+    console.error("Pi payment error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
