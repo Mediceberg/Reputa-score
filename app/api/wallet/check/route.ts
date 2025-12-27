@@ -3,51 +3,29 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const { walletAddress } = await request.json();
+    if (!walletAddress?.startsWith('G')) return NextResponse.json({ isValid: false, message: "عنوان غير صحيح" });
 
-    const res = await fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}`, { cache: 'no-store' });
-    if (!res.ok) return NextResponse.json({ isValid: false, message: "Wallet Not Found" }, { status: 404 });
-    const data = await res.json();
+    // جلب الرصيد والعمليات من الشبكة التجريبية
+    const [accRes, opsRes] = await Promise.all([
+      fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}`, { cache: 'no-store' }),
+      fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}/operations?limit=5&order=desc`)
+    ]);
 
-    const opsRes = await fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}/operations?limit=20&order=desc`);
+    if (!accRes.ok) return NextResponse.json({ isValid: false, message: "المحفظة غير موجودة" });
+
+    const accData = await accRes.json();
     const opsData = await opsRes.json();
 
-    // تحليل المعاملات لكشف السبام والتداول الحقيقي
-    let realTrades = 0;
-    let spamCount = 0;
-    const transactions = opsData._embedded.records.map((op: any) => {
-      const amount = parseFloat(op.amount || "0");
-      if (amount < 0.01) spamCount++; // رصد المعاملات الصغيرة جداً
-      if (op.type === 'manage_buy_offer' || op.type === 'create_passive_sell_offer') realTrades++; // Pi DEX activity
-      
-      return {
-        id: op.id.substring(0, 8),
-        type: op.type,
-        amount: amount,
-        isSpam: amount < 0.01,
-        date: op.created_at
-      };
-    });
+    const balance = accData.balances.find((b: any) => b.asset_type === 'native')?.balance || "0";
+    const transactions = opsData._embedded.records.map((op: any) => ({
+      type: op.type === 'payment' ? (op.from === walletAddress ? 'إرسال' : 'استلام') : 'تداول',
+      amount: op.amount || '0',
+      date: new Date(op.created_at).toLocaleDateString('ar-EG')
+    }));
 
-    // معادلة السمعة المعقدة (Reputa V3)
-    const balance = parseFloat(data.balances.find((b: any) => b.asset_type === 'native')?.balance || "0");
-    const baseScore = (balance * 0.1) + (data.sequence * 0.5) + (realTrades * 10);
-    const penalties = (spamCount * 5); // خصم نقاط للسبام
-    
-    // سقف النقاط يعتمد على اللوغاريتم ليكون التقدم أصعب كلما زادت النقاط
-    const finalScore = Math.min(99, Math.floor(Math.log10(baseScore + 1) * 30) - penalties);
+    // معادلة السمعة
+    const score = Math.min(100, (parseFloat(balance) * 0.2) + (accData.sequence * 1.5));
 
-    return NextResponse.json({ 
-      isValid: true, 
-      score: Math.max(0, finalScore),
-      analytics: {
-        balance,
-        trustLevel: finalScore > 80 ? "Institutional" : finalScore > 50 ? "Trader" : "Standard",
-        spamRisk: spamCount > 10 ? "High" : "Low",
-        dexActivity: realTrades > 0 ? "Active" : "Inactive"
-      },
-      transactions 
-    });
-  } catch (error) {
-    return NextResponse.json({ error: "Server Error" }, { status: 500 });
-  }
+    return NextResponse.json({ isValid: true, balance, score: Math.floor(score), transactions });
+  } catch (e) { return NextResponse.json({ error: "خطأ في السيرفر" }, { status: 500 }); }
 }
