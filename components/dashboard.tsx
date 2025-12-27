@@ -29,9 +29,9 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
   const [searchError, setSearchError] = useState<string | null>(null)
 
   const [mockData, setMockData] = useState<MockData>({
-    volume: 500,
-    age: 365,
-    network: 50,
+    volume: 0,
+    age: 0,
+    network: 0,
   })
   const [trustScore, setTrustScore] = useState(0)
 
@@ -46,25 +46,53 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
     setMockData(data)
   }
 
+  // دالة البحث الحقيقي المرتبطة بالبلوكشين
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!searchAddress.trim()) return
+    const address = searchAddress.trim()
+    
+    if (!address) return
+
+    // التحقق من تنسيق العنوان قبل الإرسال
+    if (!address.startsWith("G") || address.length !== 56) {
+      setSearchError("Invalid Pi address format. Must start with 'G' and be 56 chars.")
+      return
+    }
 
     setIsSearching(true)
     setSearchError(null)
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      const mockResponse = {
-        volume: Math.random() * 1000,
-        age: Math.floor(Math.random() * 730),
-        network: Math.floor(Math.random() * 100),
+      // الاتصال ببلوكشين Pi (Testnet)
+      const response = await fetch(`https://api.testnet.minepi.com/accounts/${address}`)
+      
+      if (!response.ok) {
+        throw new Error("Wallet not found on Pi Blockchain.")
       }
 
-      setMockData(mockResponse)
-    } catch (error) {
-      setSearchError("Failed to fetch wallet data. Please try again.")
+      const blockchainData = await response.json()
+
+      // تحليل البيانات الحقيقية:
+      // 1. الرصيد (Total Balance)
+      const totalBalance = blockchainData.balances?.reduce(
+        (acc: number, b: any) => acc + parseFloat(b.balance), 0
+      ) || 0
+
+      // 2. نشاط الشبكة (Sequence Number)
+      const sequence = blockchainData.sequence || 0
+
+      // تحديث البيانات في المحرك
+      const realData: MockData = {
+        volume: Math.min(totalBalance, 5000), // نضع حد أقصى للتمثيل البصري
+        age: Math.floor(Math.random() * 365) + 30, // افتراضي مؤقتاً
+        network: Math.min(sequence, 100), // نعتبر 100 عملية نشاطاً عالياً
+      }
+
+      setMockData(realData)
+      
+    } catch (error: any) {
+      setSearchError(error.message || "Failed to fetch wallet data.")
+      setTrustScore(0)
     } finally {
       setIsSearching(false)
     }
@@ -78,7 +106,7 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
         setIsPremium(true)
       }
     } catch (error) {
-      console.error("[v0] Payment error:", error)
+      console.error("Payment error:", error)
     } finally {
       setIsProcessingPayment(false)
     }
@@ -117,14 +145,14 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Pi Pay Button */}
+          {/* تم تعديل الزر لإزالة Step 10 وربطه بدالة الدفع */}
           <Button
             variant="default"
-            onClick={onPay}
+            onClick={handlePremiumVerification}
             className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white shadow-lg border-none transition-all hover:scale-105 active:scale-95"
           >
             <CreditCard className="w-4 h-4 md:mr-2" />
-            <span className="hidden md:inline font-bold">Pi Pay (Step 10)</span>
+            <span className="hidden md:inline font-bold">Pi Pay</span>
           </Button>
 
           <Button
@@ -158,7 +186,7 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
           <div className="flex gap-2 mb-2">
             <Input
               type="text"
-              placeholder="Search any Pi wallet address..."
+              placeholder="Enter a real Pi wallet (Starts with G...)"
               value={searchAddress}
               onChange={(e) => setSearchAddress(e.target.value)}
               className="flex-1 bg-background/50 border-border/50 focus:border-[var(--purple)] transition-all"
@@ -169,7 +197,7 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
               className="bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] hover:opacity-90 transition-opacity"
             >
               {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              <span className="ml-2 hidden sm:inline">Search</span>
+              <span className="ml-2 hidden sm:inline">Check Trust</span>
             </Button>
           </div>
           {searchError && (
@@ -205,7 +233,7 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
                     <h3 className="text-lg font-bold text-foreground">Premium Verification</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Unlock verified status, priority support, and advanced analytics
+                    Unlock verified status on the blockchain and advanced analytics
                   </p>
                 </div>
                 <Button
@@ -218,7 +246,7 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
                   ) : (
                     <Crown className="w-4 h-4 mr-2" />
                   )}
-                  {isProcessingPayment ? "Processing..." : "Verify for 1 Pi"}
+                  {isProcessingPayment ? "Confirming..." : "Verify for 1 Pi"}
                 </Button>
               </div>
             </motion.div>
