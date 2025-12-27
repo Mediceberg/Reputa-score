@@ -4,41 +4,54 @@ export async function POST(request: Request) {
   try {
     const { walletAddress } = await request.json();
 
-    // التحقق من الصيغة (من كودك - ممتاز جداً)
+    // فحص الصيغة لضمان عدم إرسال طلبات خاطئة للبلوكشين
     if (!walletAddress || walletAddress.length !== 56 || !walletAddress.startsWith('G')) {
-      return NextResponse.json({ isValid: false, message: "صيغة العنوان غير صحيحة" }, { status: 400 });
+      return NextResponse.json({ isValid: false, message: "Invalid Wallet Format" }, { status: 400 });
     }
 
-    // الاتصال بالبلوكشين
+    // جلب بيانات الحساب والرصيد (Testnet حالياً)
     const res = await fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}`, { cache: 'no-store' });
-    if (!res.ok) return NextResponse.json({ isValid: false, message: "المحفظة غير موجودة" }, { status: 404 });
+    if (!res.ok) return NextResponse.json({ isValid: false, message: "Wallet Not Found" }, { status: 404 });
     const data = await res.json();
 
-    // جلب العمليات مع تفاصيل المصدر
-    const opsRes = await fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}/operations?limit=5&order=desc`);
+    // جلب آخر 20 عملية لتحليل السلوك المالي
+    const opsRes = await fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}/operations?limit=20&order=desc`);
     const opsData = await opsRes.json();
 
-    const transactions = opsData._embedded.records.map((op: any) => ({
-      id: op.id.substring(0, 8),
-      type: op.type === 'payment' ? (op.from === walletAddress ? 'إرسال' : 'استلام') : 'تحويل',
-      amount: op.amount || '0',
-      from: op.from ? `${op.from.substring(0, 4)}...${op.from.slice(-4)}` : '---', // إضافة العنوان المختصر
-      date: new Date(op.created_at).toLocaleDateString('ar-EG')
-    }));
-
-    const balance = data.balances.find((b: any) => b.asset_type === 'native')?.balance || "0";
+    let dexTrades = 0;
+    let spamPenalty = 0;
     
-    // حساب النقاط الشامل
-    const score = Math.min(100, (parseFloat(balance) * 0.3) + (data.sequence * 1.3));
+    const transactions = opsData._embedded.records.map((op: any) => {
+      const amount = parseFloat(op.amount || "0");
+      // كشف المعاملات الصغيرة جداً (Spam Detection)
+      if (amount > 0 && amount < 0.01) spamPenalty += 2;
+      // كشف نشاط التداول (DEX Detection)
+      if (op.type.includes('offer')) dexTrades++;
+
+      return {
+        id: op.id.substring(0, 8),
+        type: op.type === 'payment' ? (op.from === walletAddress ? 'OUT' : 'IN') : 'DEX',
+        amount: amount,
+        isSpam: amount > 0 && amount < 0.01,
+        date: new Date(op.created_at).toISOString()
+      };
+    });
+
+    const balance = parseFloat(data.balances.find((b: any) => b.asset_type === 'native')?.balance || "0");
+    
+    // معادلة السمعة العادلة (توازن بين الرصيد والنشاط والنوعية)
+    // التقدم يصبح أصعب كلما اقتربت من 100
+    const rawScore = (balance * 0.15) + (data.sequence * 0.4) + (dexTrades * 5);
+    const finalScore = Math.min(99, Math.floor(Math.log10(rawScore + 1) * 35) - spamPenalty);
 
     return NextResponse.json({ 
       isValid: true, 
-      balance, 
-      score: Math.floor(score),
+      score: Math.max(5, finalScore), // الحد الأدنى 5 لضمان رغبة المستخدم في الزيادة
+      balance,
       transactions,
-      account_age: data.sequence // مؤشر إضافي لقدم الحساب
+      tier: finalScore > 85 ? 'Institutional' : finalScore > 60 ? 'Pro Trader' : 'Pioneer'
     });
   } catch (error) {
-    return NextResponse.json({ error: "خطأ في السيرفر الرئيسي" }, { status: 500 });
+    return NextResponse.json({ error: "Blockchain Sync Error" }, { status: 500 });
   }
 }
