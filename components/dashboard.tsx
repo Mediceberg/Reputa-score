@@ -1,283 +1,92 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { TrustScoreGauge } from "@/components/trust-score-gauge"
-import { TierCards } from "@/components/tier-cards"
-import { TransactionChart } from "@/components/transaction-chart"
-import { Sandbox } from "@/components/sandbox"
-import { LogOut, Settings, Search, Crown, Loader2, AlertCircle, CreditCard } from "lucide-react"
-import { calculateTrustScore, type MockData } from "@/lib/reputation-engine"
-import { usePiNetwork } from "@/hooks/use-pi-network"
 
 interface DashboardProps {
-  walletAddress: string
-  username?: string
-  onDisconnect: () => void
-  onPay?: () => void 
+  walletAddress: string;
+  username: string;
+  data: any; // البيانات الحقيقية من البلوكشين
+  onDisconnect: () => void;
 }
 
-export function Dashboard({ walletAddress, username, onDisconnect, onPay }: DashboardProps) {
-  const [showSandbox, setShowSandbox] = useState(false)
-  const [searchAddress, setSearchAddress] = useState("")
-  const [isSearching, setIsSearching] = useState(false)
-  const [isPremium, setIsPremium] = useState(false)
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
-
-  const [mockData, setMockData] = useState<MockData>({
-    volume: 0,
-    age: 0,
-    network: 0,
-  })
-  const [trustScore, setTrustScore] = useState(0)
-
-  const { createPayment } = usePiNetwork()
-
-  useEffect(() => {
-    const score = calculateTrustScore(mockData)
-    setTrustScore(score)
-  }, [mockData])
-
-  const handleMockDataChange = (data: MockData) => {
-    setMockData(data)
-  }
-
-  // دالة البحث الحقيقي المرتبطة بالبلوكشين
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const address = searchAddress.trim()
-    
-    if (!address) return
-
-    // التحقق من تنسيق العنوان قبل الإرسال
-    if (!address.startsWith("G") || address.length !== 56) {
-      setSearchError("Invalid Pi address format. Must start with 'G' and be 56 chars.")
-      return
-    }
-
-    setIsSearching(true)
-    setSearchError(null)
-
-    try {
-      // الاتصال ببلوكشين Pi (Testnet)
-      const response = await fetch(`https://api.testnet.minepi.com/accounts/${address}`)
-      
-      if (!response.ok) {
-        throw new Error("Wallet not found on Pi Blockchain.")
-      }
-
-      const blockchainData = await response.json()
-
-      // تحليل البيانات الحقيقية:
-      // 1. الرصيد (Total Balance)
-      const totalBalance = blockchainData.balances?.reduce(
-        (acc: number, b: any) => acc + parseFloat(b.balance), 0
-      ) || 0
-
-      // 2. نشاط الشبكة (Sequence Number)
-      const sequence = blockchainData.sequence || 0
-
-      // تحديث البيانات في المحرك
-      const realData: MockData = {
-        volume: Math.min(totalBalance, 5000), // نضع حد أقصى للتمثيل البصري
-        age: Math.floor(Math.random() * 365) + 30, // افتراضي مؤقتاً
-        network: Math.min(sequence, 100), // نعتبر 100 عملية نشاطاً عالياً
-      }
-
-      setMockData(realData)
-      
-    } catch (error: any) {
-      setSearchError(error.message || "Failed to fetch wallet data.")
-      setTrustScore(0)
-    } finally {
-      setIsSearching(false)
-    }
-  }
-
-  const handlePremiumVerification = async () => {
-    setIsProcessingPayment(true)
-    try {
-      const paymentId = await createPayment(walletAddress)
-      if (paymentId) {
-        setIsPremium(true)
-      }
-    } catch (error) {
-      console.error("Payment error:", error)
-    } finally {
-      setIsProcessingPayment(false)
-    }
-  }
-
+export function Dashboard({ walletAddress, username, data, onDisconnect }: DashboardProps) {
   return (
-    <div className="min-h-screen p-4 pb-20 md:p-6">
-      {/* Header */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="flex items-center justify-between mb-6"
-      >
+    <div className="p-4 max-w-4xl mx-auto space-y-6 text-right" dir="rtl">
+      {/* الرأس: الترحيب وزر الخروج */}
+      <div className="flex justify-between items-center bg-gray-900/50 p-4 rounded-2xl border border-gray-800">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] bg-clip-text text-transparent">
-              REPUTA
-            </h1>
-            {isPremium && (
-              <motion.span
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: "spring", duration: 0.6 }}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] text-xs font-semibold text-white"
-              >
-                <Crown className="w-3 h-3" />
-                PREMIUM
-              </motion.span>
-            )}
+          <h2 className="text-xl font-bold text-white">أهلاً، {username || 'رائد بي'}</h2>
+          <p className="text-xs text-gray-400 font-mono">{walletAddress.substring(0, 15)}...</p>
+        </div>
+        <button onClick={onDisconnect} className="text-red-400 text-sm hover:underline">خروج</button>
+      </div>
+
+      {/* القسم العلوي: النقاط والرصيد */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* بطاقة تقييم السمعة (Trust Score) */}
+        <div className="bg-gradient-to-br from-gray-900 to-black p-6 rounded-3xl border border-purple-500/30 relative overflow-hidden">
+          <h3 className="text-gray-400 mb-2">مستوى الثقة (Reputa Score)</h3>
+          <div className="flex items-end gap-2">
+            <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+              {data.score}
+            </span>
+            <span className="text-gray-500 pb-2">/ 100</span>
           </div>
-          {username && <p className="text-sm text-[var(--gold)] font-medium">@{username}</p>}
-          <p className="text-xs text-muted-foreground truncate max-w-[200px] md:max-w-none font-mono">
-            {walletAddress}
-          </p>
+          <p className="mt-2 text-sm text-purple-300 font-medium">الفئة: {data.tier}</p>
+          {/* تأثير بصري للخلفية */}
+          <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-purple-600/10 blur-3xl rounded-full"></div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* تم تعديل الزر لإزالة Step 10 وربطه بدالة الدفع */}
-          <Button
-            variant="default"
-            onClick={handlePremiumVerification}
-            className="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white shadow-lg border-none transition-all hover:scale-105 active:scale-95"
-          >
-            <CreditCard className="w-4 h-4 md:mr-2" />
-            <span className="hidden md:inline font-bold">Pi Pay</span>
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowSandbox(!showSandbox)}
-            className={`glass border-border/50 transition-all ${showSandbox ? "bg-[var(--purple)]/20 border-[var(--purple)]" : ""}`}
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onDisconnect}
-            className="glass border-border/50 bg-transparent hover:bg-destructive/10 hover:border-destructive"
-          >
-            <LogOut className="w-4 h-4" />
-          </Button>
-        </div>
-      </motion.div>
-
-      {/* Search Section */}
-      <motion.div
-        initial={{ y: -10, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.5 }}
-        className="mb-6"
-      >
-        <form onSubmit={handleSearch} className="glass rounded-xl p-4 glow-purple">
-          <div className="flex gap-2 mb-2">
-            <Input
-              type="text"
-              placeholder="Enter a real Pi wallet (Starts with G...)"
-              value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
-              className="flex-1 bg-background/50 border-border/50 focus:border-[var(--purple)] transition-all"
-            />
-            <Button
-              type="submit"
-              disabled={!searchAddress.trim() || isSearching}
-              className="bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] hover:opacity-90 transition-opacity"
-            >
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              <span className="ml-2 hidden sm:inline">Check Trust</span>
-            </Button>
+        {/* بطاقة الرصيد الحقيقي */}
+        <div className="bg-gray-900 p-6 rounded-3xl border border-gray-800 flex flex-col justify-center">
+          <h3 className="text-gray-400 mb-1">الرصيد المتاح حالياً</h3>
+          <p className="text-4xl font-bold text-yellow-500">{data.balance} <span className="text-lg">Pi</span></p>
+          <div className="mt-4 h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+             <div className="h-full bg-yellow-500" style={{ width: `${Math.min(data.balance, 100)}%` }}></div>
           </div>
-          {searchError && (
-            <div className="flex items-center gap-2 text-xs text-destructive">
-              <AlertCircle className="w-3 h-3" />
-              {searchError}
-            </div>
-          )}
-        </form>
-      </motion.div>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-9 space-y-6">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-          >
-            <TrustScoreGauge score={trustScore} isPremium={isPremium} />
-          </motion.div>
-
-          {!isPremium && (
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-              className="glass rounded-xl p-6 glow-gold border border-[var(--gold)]/20"
-            >
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="text-center md:text-left flex-1">
-                  <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                    <Crown className="w-5 h-5 text-[var(--gold)]" />
-                    <h3 className="text-lg font-bold text-foreground">Premium Verification</h3>
+      {/* قسم جدول المعاملات الأخيرة */}
+      <div className="bg-gray-900 rounded-3xl border border-gray-800 overflow-hidden">
+        <div className="p-5 border-b border-gray-800 flex justify-between items-center">
+          <h3 className="font-bold text-white text-lg">آخر معاملات الشبكة</h3>
+          <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-1 rounded">مباشر من البلوكشين</span>
+        </div>
+        <div className="divide-y divide-gray-800">
+          {data.transactions && data.transactions.length > 0 ? (
+            data.transactions.map((tx: any) => (
+              <div key={tx.id} className="p-4 flex justify-between items-center hover:bg-white/5 transition-colors">
+                <div className="flex gap-3 items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'استلام' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                    {tx.type === 'استلام' ? '↙' : '↗'}
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Unlock verified status on the blockchain and advanced analytics
-                  </p>
+                  <div>
+                    <p className="text-white font-medium text-sm">{tx.type} عملات بي</p>
+                    <p className="text-[10px] text-gray-500">من: {tx.from} • {tx.date}</p>
+                  </div>
                 </div>
-                <Button
-                  onClick={handlePremiumVerification}
-                  disabled={isProcessingPayment}
-                  className="bg-gradient-to-r from-[var(--purple)] to-[var(--gold)] hover:opacity-90 font-semibold h-12 px-6"
-                >
-                  {isProcessingPayment ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Crown className="w-4 h-4 mr-2" />
-                  )}
-                  {isProcessingPayment ? "Confirming..." : "Verify for 1 Pi"}
-                </Button>
+                <div className="text-left">
+                  <p className={`font-bold ${tx.type === 'استلام' ? 'text-green-400' : 'text-red-400'}`}>
+                    {tx.type === 'استلام' ? '+' : '-'}{tx.amount}
+                  </p>
+                  <p className="text-[10px] text-gray-600 font-mono">ID: {tx.id}</p>
+                </div>
               </div>
-            </motion.div>
+            ))
+          ) : (
+            <div className="p-10 text-center text-gray-500">لا توجد معاملات حديثة لهذه المحفظة</div>
           )}
-
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-          >
-            <TierCards currentScore={trustScore} />
-          </motion.div>
-
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-          >
-            <TransactionChart />
-          </motion.div>
         </div>
+      </div>
 
-        {showSandbox && (
-          <motion.div
-            initial={{ x: 20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            className="lg:col-span-3"
-          >
-            <Sandbox mockData={mockData} onDataChange={handleMockDataChange} />
-          </motion.div>
-        )}
+      {/* زر التقرير المفصل */}
+      <div className="bg-purple-900/20 p-6 rounded-3xl border border-purple-500/20 text-center">
+        <h4 className="text-white font-bold mb-2">هل تريد تحليلاً أعمق؟</h4>
+        <p className="text-sm text-gray-400 mb-4">احصل على تقرير مفصل لنشاط محفظتك، مصادر العملات، وتصنيف الأمان الشامل.</p>
+        <button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-purple-900/40">
+          تفعيل التقرير الممتاز (1 Pi)
+        </button>
       </div>
     </div>
   )
