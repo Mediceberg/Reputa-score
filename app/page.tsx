@@ -11,21 +11,25 @@ export default function HomePage() {
   const [isConnected, setIsConnected] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
-  // تأمين التحميل في المتصفح فقط لمنع Client-side exception
+  // 1. حل مشكلة Hydration و Application Error
   useEffect(() => {
     setIsMounted(true)
+    
+    // 2. تفعيل Pi SDK لضمان التعرف على هوية الرائد
     if (typeof window !== 'undefined' && window.Pi) {
       window.Pi.authenticate(['payments', 'username'], (payment: any) => {
         console.log("Incomplete payment found", payment);
-      }).catch((err: any) => console.error("Pi Auth Error:", err));
+      }).catch((err: any) => {
+        console.error("Pi Authentication failed:", err);
+      });
     }
-  }, []);
-
-  if (!isMounted) return null; // يمنع الخطأ عند التحميل الأولي
+  }, [])
 
   const handleConnect = (address: string, piUsername?: string) => {
     setWalletAddress(address)
-    if (piUsername) setUsername(piUsername)
+    if (piUsername) {
+      setUsername(piUsername)
+    }
     setIsConnected(true)
   }
 
@@ -35,16 +39,37 @@ export default function HomePage() {
     setUsername("")
   }
 
+  // منع الرندر على السيرفر لتفادي أخطاء الـ Client-side
+  if (!isMounted) return null
+
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background">
       <AnimatePresence mode="wait">
         {!isConnected ? (
-          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div
+            key="entry"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* نمرر وظيفة الربط لصفحة الدخول */}
             <EntryPage onConnect={handleConnect} />
           </motion.div>
         ) : (
-          <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-            <Dashboard walletAddress={walletAddress} username={username} onDisconnect={handleDisconnect} />
+          <motion.div
+            key="dashboard"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* نمرر البيانات للوحة التحكم */}
+            <Dashboard 
+              walletAddress={walletAddress} 
+              username={username} 
+              onDisconnect={handleDisconnect} 
+            />
           </motion.div>
         )}
       </AnimatePresence>
