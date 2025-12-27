@@ -1,120 +1,104 @@
-"use client"
+"use client";
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { EntryPage } from "@/components/entry-page"
-import { Dashboard } from "@/components/dashboard"
+// نظام اللغات المتكامل
+const content = {
+  en: { check: "Analyze", score: "Reputa Score", bal: "Balance", spam: "Risk Detected" },
+  ar: { check: "تحليل", score: "مؤشر السمعة", bal: "الرصيد", spam: "مخاطر مكتشفة" },
+  fr: { check: "Analyser", score: "Score Reputa", bal: "Solde", spam: "Risque Détecté" }
+};
 
-export default function HomePage() {
-  const [walletAddress, setWalletAddress] = useState<string>("")
-  const [username, setUsername] = useState<string>("")
-  const [isConnected, setIsConnected] = useState(false)
-  
-  // تخزين البيانات الشاملة: النقاط، المعاملات، والرصيد
-  const [blockchainData, setBlockchainData] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
+export default function App() {
+  const [lang, setLang] = useState('en');
+  const [address, setAddress] = useState('');
+  const [results, setResults] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleConnect = async (address: string, piUsername?: string) => {
-    if (!address.startsWith('G') || address.length !== 56) {
-      alert("يرجى إدخال عنوان محفظة Pi صحيح (يبدأ بحرف G)");
-      return;
-    }
+  const t = content[lang as keyof typeof content];
 
-    setIsLoading(true);
+  const performAnalysis = async () => {
+    setLoading(true);
+    setError('');
     try {
-      // الاتصال بالمسار الجديد الذي أنشأناه في السيرفر
-      const response = await fetch('/api/wallet/check', {
+      const res = await fetch('/api/wallet/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
       });
-
-      const data = await response.json();
-
-      if (data.isValid) {
-        // إذا نجح التحقق، نمرر كل البيانات (المعاملات + النقاط + الرصيد)
-        setBlockchainData({
-          score: data.score,
-          balance: data.balance,
-          transactions: data.transactions, // مصفوفة المعاملات الحقيقية
-          tier: data.score > 80 ? "Elite" : "Trusted",
-          isPremium: false // قيمة افتراضية حتى يتم الدفع
-        });
-        
-        setWalletAddress(address);
-        if (piUsername) setUsername(piUsername);
-        setIsConnected(true);
-      } else {
-        alert(data.message || "المحفظة غير موجودة في سجلات البلوكشين");
-      }
-    } catch (error) {
-      alert("فشل الاتصال بمحرك البلوكشين. تأكد من إعدادات Vercel ووجود المفاتيح.");
+      const data = await res.json();
+      if (data.isValid) setResults(data);
+      else setError(data.message);
+    } catch (err) {
+      setError("Connection Failed");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }
-
-  const handleDisconnect = () => {
-    setIsConnected(false)
-    setWalletAddress("")
-    setUsername("")
-    setBlockchainData(null)
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* طبقة التحميل الاحترافية */}
-      <AnimatePresence>
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md"
-          >
-            <div className="relative w-24 h-24">
-              <div className="absolute inset-0 border-4 border-purple-500/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-t-purple-600 rounded-full animate-spin"></div>
-            </div>
-            <motion.p 
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              className="mt-4 text-purple-400 font-medium text-lg"
-            >
-              جاري تحليل بيانات البلوكشين...
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <main className="min-h-screen bg-[#050505] text-white p-6">
+      {/* تبديل اللغات */}
+      <div className="flex justify-end gap-2 mb-8">
+        {['en', 'ar', 'fr'].map(l => (
+          <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 rounded-full text-xs ${lang === l ? 'bg-yellow-500 text-black' : 'bg-white/5'}`}>
+            {l.toUpperCase()}
+          </button>
+        ))}
+      </div>
 
-      <AnimatePresence mode="wait">
-        {!isConnected ? (
-          <motion.div
-            key="entry"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            transition={{ duration: 0.4 }}
+      <div className="max-w-2xl mx-auto space-y-8">
+        {/* محرك البحث الحقيقي */}
+        <section className="bg-[#111] p-8 rounded-3xl border border-white/5 shadow-2xl">
+          <input 
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            className="w-full bg-black border border-white/10 p-5 rounded-2xl mb-4 text-center font-mono focus:border-yellow-500 transition-all outline-none"
+            placeholder="G..." 
+          />
+          <button 
+            disabled={loading}
+            onClick={performAnalysis}
+            className="w-full py-5 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-2xl font-black uppercase tracking-widest hover:brightness-125 transition-all disabled:opacity-50"
           >
-            <EntryPage onConnect={handleConnect} />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -30 }}
-            transition={{ type: "spring", damping: 25, stiffness: 120 }}
-          >
-            <Dashboard 
-              walletAddress={walletAddress} 
-              username={username} 
-              data={blockchainData} 
-              onDisconnect={handleDisconnect} 
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
+            {loading ? "..." : t.check}
+          </button>
+          {error && <p className="text-red-500 text-center mt-4 text-sm">{error}</p>}
+        </section>
+
+        {/* عرض النتائج الاحترافية */}
+        <AnimatePresence>
+          {results && (
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="space-y-6">
+              {/* بطاقة السمعة الدائرية (تصور) */}
+              <div className="bg-[#111] p-10 rounded-3xl text-center relative overflow-hidden">
+                <div className="text-sm text-gray-400 mb-2 uppercase">{t.score}</div>
+                <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-400 to-orange-700">
+                  {results.score}
+                </div>
+                <div className="mt-2 text-yellow-500 font-bold tracking-widest">{results.tier}</div>
+              </div>
+
+              {/* تفاصيل الرصيد والمعاملات */}
+              <div className="grid grid-cols-1 gap-4">
+                {results.transactions.map((tx: any) => (
+                  <div key={tx.id} className={`p-5 rounded-2xl bg-[#111] border-l-4 ${tx.isSpam ? 'border-red-600' : 'border-green-500'} flex justify-between items-center`}>
+                    <div>
+                      <div className="font-bold flex items-center gap-2">
+                        {tx.type} {tx.amount} π
+                        {tx.isSpam && <span className="text-[10px] bg-red-600 px-2 rounded-full">{t.spam}</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-500">{tx.date.split('T')[0]}</div>
+                    </div>
+                    <div className="text-xs text-gray-600 font-mono">#{tx.id}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </main>
+  );
 }
