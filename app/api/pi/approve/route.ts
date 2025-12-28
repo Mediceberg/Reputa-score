@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic'; // يمنع التخزين المؤقت للطلبات (مهم جداً)
+
 export async function POST(request: Request) {
   try {
     const { paymentId } = await request.json();
     
-    // تأكد أن PI_API_KEY في Vercel لا يحتوي على كلمة Key إذا كنت تضيفها هنا
     const response = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
       method: 'POST',
       headers: {
@@ -14,11 +15,15 @@ export async function POST(request: Request) {
     });
 
     const data = await response.json();
+    
     if (response.ok) {
+      console.log("Payment approved successfully:", paymentId);
       return NextResponse.json(data, { status: 200 });
     }
-    return NextResponse.json({ error: "Approval Failed" }, { status: 400 });
+
+    console.error("Pi API Error:", data);
+    return NextResponse.json({ error: data.message || "Approval Failed" }, { status: 400 });
   } catch (err) {
-    return NextResponse.json({ error: "Server Error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
