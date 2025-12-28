@@ -18,17 +18,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* تحميل المكتبة قبل التفاعل مع الصفحة */}
+        {/* تحميل المكتبة باستراتيجية التفاعل الفوري */}
         <Script 
           src="https://sdk.minepi.com/pi-sdk.js" 
           strategy="beforeInteractive" 
         />
-        {/* تفعيل المكتبة في وضع التجربة sandbox */}
         <Script id="pi-sdk-init" strategy="afterInteractive">
           {`
             if (window.Pi) {
-              window.Pi.init({ version: "2.0", sandbox: true });
-              console.log("Pi SDK Initialized with Sandbox Mode");
+              // إزالة وضع Sandbox لضمان الربط الحقيقي مع السيرفر
+              window.Pi.init({ version: "2.0" });
+              console.log("Pi SDK Initialized Successfully");
             }
           `}
         </Script>
