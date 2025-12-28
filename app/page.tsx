@@ -28,43 +28,41 @@ export default function HomePage() {
     if (type !== "loading") setTimeout(() => setNotification(null), 4000);
   }, []);
 
-  // --- 1. نظام الربط التلقائي وجلب البيانات الحقيقية ---
+  // الرابط الصريح لضمان عدم ضياع الطلب في Vercel Logs
+  const API_BASE_URL = "https://reputa-score.vercel.app";
+
   useEffect(() => {
     const loginToPi = async () => {
       if (typeof window !== "undefined" && window.Pi) {
         try {
           const scopes = ['username', 'payments'];
           const auth = await window.Pi.authenticate(scopes, (payment: any) => {
-            console.log("Payment callback status:", payment);
+            console.log("Payment callback:", payment);
           });
           
           if (auth && auth.user) {
             setUsername(auth.user.username);
-            console.log("Authenticated as:", auth.user.username);
           }
         } catch (error) {
           console.error("Auth Error:", error);
-          showToast("Please open via Pi Browser", "error");
         }
       }
     };
     loginToPi();
-  }, [showToast]);
+  }, []);
 
-  // --- 2. منطق فحص المحفظة ---
   const handleConnect = async (address: string) => {
     setIsLoading(true);
-    showToast(lang === 'ar' ? "جاري مزامنة حسابك..." : "Syncing account...", "loading");
+    showToast(lang === 'ar' ? "جاري المزامنة..." : "Syncing...", "loading");
     
     try {
-      const response = await fetch('/api/wallet/check', {
+      const response = await fetch(`${API_BASE_URL}/api/wallet/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
       });
 
       const data = await response.json();
-
       if (data.isValid) {
         setBlockchainData(data);
         setWalletAddress(address);
@@ -80,7 +78,6 @@ export default function HomePage() {
     }
   }
 
-  // --- 3. منطق الدفع المعدل لضمان السرعة (الموافقة الفورية) ---
   const handlePayment = async () => {
     try {
       showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
@@ -92,39 +89,37 @@ export default function HomePage() {
 
       await window.Pi.createPayment({
         amount: 1,
-        memo: `Reputation report for ${username}`,
+        memo: `Report for ${username}`,
         metadata: { wallet: walletAddress, user: username },
       }, {
         onReadyForServerApproval: async (paymentId: string) => {
-          // التعديل: إرسال الطلب وإرجاع الـ JSON فوراً لإيقاف العداد التنازلي
-          const response = await fetch(`${window.location.origin}/api/pi/approve`, {
+          // استخدام الرابط الصريح المباشر
+          const response = await fetch(`${API_BASE_URL}/api/pi/approve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
           });
           
-          if (!response.ok) throw new Error("Approval failed on server");
-          return response.json(); // هذا السطر يمنع "Paiement expiré"
+          if (!response.ok) throw new Error("Approval Failed");
+          return response.json();
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          const res = await fetch(`${window.location.origin}/api/pi/complete`, {
+          const res = await fetch(`${API_BASE_URL}/api/pi/complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           });
           
           if (res.ok) {
-            showToast(lang === 'ar' ? "تم التفعيل بنجاح!" : "Activated Successfully!", "success");
+            showToast(lang === 'ar' ? "تم بنجاح!" : "Activated!", "success");
             return res.json();
           }
-          throw new Error("Completion failed");
+          throw new Error("Completion Failed");
         },
         onCancel: () => showToast("Cancelled", "info"),
-        
         onError: (error: Error, paymentId?: string) => {
-          console.error("Payment Error Details:", error);
-          // تنبيه تقني يساعدنا في التشخيص إذا استمر العطل
-          alert(`PI SDK ERROR: ${error.message} \nPaymentID: ${paymentId || 'N/A'}`);
+          // تنبيه منبثق للتشخيص الفوري في حال عدم وصول الطلب للـ Logs
+          alert(`CRITICAL: ${error.message} \nID: ${paymentId || 'NONE'}`);
           showToast("Payment Failed", "error");
         },
       });
@@ -162,8 +157,7 @@ export default function HomePage() {
       <div className="fixed top-4 right-4 z-50 flex gap-2">
         {['en', 'ar'].map((l) => (
           <button 
-            key={l} 
-            onClick={() => setLang(l)} 
+            key={l} onClick={() => setLang(l)} 
             className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800 text-gray-400'}`}
           >
             {l.toUpperCase()}
@@ -172,7 +166,7 @@ export default function HomePage() {
       </div>
 
       {isLoading && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md text-center">
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
             <p className="text-purple-400 font-black animate-pulse uppercase tracking-widest">
