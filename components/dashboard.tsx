@@ -22,6 +22,23 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
   const [walletData, setWalletData] = useState<any>(null)
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
+  // 1. تأكيد المصادقة عند تحميل اللوحة لضمان عمل أزرار الـ SDK
+  useEffect(() => {
+    const initPi = async () => {
+      if ((window as any).Pi) {
+        try {
+          // هذه الخطوة ضرورية جداً ليتمكن المتصفح من فتح نافذة الدفع لاحقاً
+          await (window as any).Pi.authenticate(["payments", "username"], (payment: any) => {
+            console.log("Auth scoped for payments");
+          });
+        } catch (e) {
+          console.error("Auth failed", e);
+        }
+      }
+    };
+    initPi();
+  }, []);
+
   const performSearch = useCallback(async (address: string) => {
     if (!address || !address.startsWith('G')) {
       setSearchError("Invalid Pi Address");
@@ -52,40 +69,48 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
     if (walletAddress) performSearch(walletAddress);
   }, [walletAddress, performSearch]);
 
-  // --- تفعيل زر الدفع VIP الحقيقي ---
+  // --- إصلاح زر الدفع VIP ---
   const handleUpgradeToVIP = async () => {
-    if (!(window as any).Pi) return alert("يرجى فتح التطبيق داخل متصفح Pi Browser");
+    const piSDK = (window as any).Pi;
+    if (!piSDK) return alert("يرجى فتح التطبيق داخل متصفح Pi Browser");
     
     setIsProcessingPayment(true);
+    
     try {
-      const payment = await (window as any).Pi.createPayment({
+      // استدعاء واجهة الدفع الرسمية
+      await piSDK.createPayment({
         amount: 1, 
         memo: "تفعيل التقرير المفصل وتحليل السمعة VIP",
         metadata: { wallet: walletAddress }
       }, {
         onReadyForServerApproval: (paymentId: string) => {
-          // هنا يتم إرسال المعرف للسيرفر (يمكنك إضافة Fetch هنا لاحقاً للتوثيق)
-          console.log("Payment Approved by User:", paymentId);
+          console.log("Payment waiting approval:", paymentId);
+          // في بيئة الاختبار (Sandbox)، يتم الموافقة أحياناً تلقائياً
         },
         onReadyForServerCompletion: (paymentId: string, txid: string) => {
-          // بمجرد اكتمال المعاملة على البلوكشين
-          setIsPremium(true); // فتح التقرير فوراً
+          // نجاح العملية
+          setIsPremium(true); 
+          setIsProcessingPayment(false);
+          alert("تم تفعيل ميزات VIP بنجاح!");
+        },
+        onCancel: (paymentId: string) => {
           setIsProcessingPayment(false);
         },
-        onCancel: (paymentId: string) => setIsProcessingPayment(false),
         onError: (error: Error, payment?: any) => {
-          console.error(error);
+          console.error("Payment Error:", error);
           setIsProcessingPayment(false);
+          alert("فشلت عملية الدفع. تأكد من رصيدك في Testnet");
         },
       });
     } catch (e) {
+      console.error("SDK logic error:", e);
       setIsProcessingPayment(false);
     }
   };
 
   return (
     <div className="min-h-screen p-4 pb-20 md:p-6 bg-black">
-      {/* Header - نفس التصميم */}
+      {/* Header */}
       <motion.div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-black text-purple-500 tracking-tighter">REPUTA <span className="text-[10px] text-zinc-600">v2.1</span></h1>
@@ -124,7 +149,6 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
                <TrustScoreGauge score={walletData.score} isPremium={isPremium} />
             </div>
             
-            {/* VIP Card - التغيير هنا لفتح التقرير */}
             {!isPremium && (
               <div className="md:col-span-5 bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[32px] border border-amber-500/30 flex flex-col justify-between shadow-2xl">
                 <div>
@@ -149,7 +173,6 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
 
         {walletData && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Recent Activity */}
             <div className="bg-zinc-900/30 p-6 rounded-[32px] border border-white/5 backdrop-blur-sm">
               <h3 className="text-white font-bold mb-4 flex items-center gap-2 text-sm"><History className="w-4 h-4 text-purple-500"/> Transactions History</h3>
               <div className="space-y-3">
@@ -168,7 +191,6 @@ export function Dashboard({ walletAddress, username, onDisconnect }: DashboardPr
               </div>
             </div>
 
-            {/* VIP Report Section - يفتح تلقائياً بعد الدفع */}
             <div className={`relative p-6 rounded-[32px] border transition-all duration-1000 ${isPremium ? 'bg-purple-900/20 border-purple-500/50 shadow-[0_0_30px_rgba(168,85,247,0.15)]' : 'bg-zinc-900/10 border-zinc-800'}`}>
               <AnimatePresence>
                 {!isPremium && (
