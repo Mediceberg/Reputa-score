@@ -1,93 +1,183 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Dashboard } from "@/components/dashboard"
 import { EntryPage } from "@/components/entry-page"
-import { CheckCircle2, XCircle, Info } from "lucide-react"
+import { Dashboard } from "@/components/dashboard"
+
+const notificationIcons = {
+  success: "✅",
+  error: "❌",
+  loading: "⏳",
+  info: "ℹ️"
+};
 
 export default function HomePage() {
-  const [walletAddress, setWalletAddress] = useState("");
-  const [username, setUsername] = useState(""); 
-  const [isConnected, setIsConnected] = useState(false);
-  const [blockchainData, setBlockchainData] = useState<any>(null);
-  const [toast, setToast] = useState<{msg: string, type: string} | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string>("")
+  const [username, setUsername] = useState<string>("") 
+  const [isConnected, setIsConnected] = useState(false)
+  const [blockchainData, setBlockchainData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [lang, setLang] = useState('en')
+  const [notification, setNotification] = useState<string | null>(null)
+  const [notifType, setNotifType] = useState<keyof typeof notificationIcons>("info")
 
-  const showToast = (msg: string, type: string) => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  }
-
-  useEffect(() => {
-    const initPi = async () => {
-      const piWindow = (window as any).Pi;
-      if (piWindow) {
-        try {
-          const auth = await piWindow.authenticate(['username', 'payments'], () => {});
-          if (auth?.user) setUsername(auth.user.username);
-        } catch (e) { console.warn("Waiting for SDK..."); }
-      }
-    };
-    setTimeout(initPi, 1500);
+  const showToast = useCallback((msg: string, type: keyof typeof notificationIcons) => {
+    setNotifType(type);
+    setNotification(msg);
+    if (type !== "loading") setTimeout(() => setNotification(null), 4000);
   }, []);
 
+  // --- 1. إصلاح نظام الربط التلقائي (الـ Auth) ---
+  useEffect(() => {
+    const loginToPi = async () => {
+      // التأكد من أننا داخل Pi Browser وأن الـ SDK جاهز
+      if (typeof window !== "undefined" && (window as any).Pi) {
+        try {
+          const Pi = (window as any).Pi;
+          
+          // طلب الصلاحيات بشكل صريح
+          const auth = await Pi.authenticate(['username', 'payments'], (payment: any) => {
+            console.log("Payment in progress:", payment);
+          });
+          
+          if (auth && auth.user) {
+            setUsername(auth.user.username); // هنا سيظهر الاسم أخيراً
+            console.log("Authenticated User:", auth.user.username);
+          }
+        } catch (error: any) {
+          console.error("Auth failed:", error);
+          // إذا ظهر لك خطأ هنا، فهذا يعني أنك لم تضف رابط التطبيق في Pi Developer Portal
+          showToast("Authentication Error", "error");
+        }
+      }
+    };
+
+    // إضافة تأخير بسيط للتأكد من تحميل الـ SDK في المتصفح
+    const timer = setTimeout(loginToPi, 1000);
+    return () => clearTimeout(timer);
+  }, [showToast]);
+
+  // --- 2. منطق فحص المحفظة ---
   const handleConnect = async (address: string) => {
+    setIsLoading(true);
+    showToast(lang === 'ar' ? "جاري مزامنة حسابك..." : "Syncing account...", "loading");
+    
     try {
-      const res = await fetch('/api/wallet/check', {
+      const response = await fetch('/api/wallet/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
       });
-      const data = await res.json();
+
+      const data = await response.json();
+
       if (data.isValid) {
         setBlockchainData(data);
         setWalletAddress(address);
         setIsConnected(true);
-        showToast("Connected", "success");
+        setNotification(null);
       } else {
-        showToast("Invalid Wallet", "error");
+        showToast(data.message || "Invalid Wallet", "error");
       }
-    } catch (e) {
-      showToast("Sync Error", "error");
+    } catch (error) {
+      showToast("Blockchain Error", "error");
+    } finally {
+      setIsLoading(false);
     }
   }
 
-  // ربط الدفع بنافذة المتصفح لتسهيل استدعائه من Dashboard
-  useEffect(() => {
-    (window as any).onStartPayment = async () => {
-      const piWindow = (window as any).Pi;
-      if (!piWindow) return;
-      try {
-        await piWindow.createPayment({
-          amount: 1,
-          memo: "Pro Audit Subscription",
-          metadata: { wallet: walletAddress }
-        }, {
-          onReadyForServerApproval: (id: string) => fetch('/api/pi/approve', { method: 'POST', body: JSON.stringify({ paymentId: id }) }),
-          onReadyForServerCompletion: () => {
-             showToast("Upgrade Successful!", "success");
-             setTimeout(() => window.location.reload(), 1500);
-          },
-          onCancel: () => showToast("Cancelled", "info"),
-          onError: (e: Error) => showToast(e.message, "error")
-        });
-      } catch (e) { showToast("System Error", "error"); }
+  // --- 3. منطق الدفع (مع إضافة تنبيهات لكشف العطل) ---
+  const handlePayment = async () => {
+    // اختبار أولي: هل الدالة تُستدعى؟
+    console.log("Button clicked, initiating payment...");
+
+    if (!(window as any).Pi) {
+      alert("Pi SDK not detected!");
+      return;
     }
-  }, [walletAddress]);
+
+    if (!username) {
+      alert("User not authenticated. Please restart Pi Browser.");
+      return;
+    }
+
+    try {
+      showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
+      
+      await (window as any).Pi.createPayment({
+        amount: 1,
+        memo: `Reputation report for ${username}`,
+        metadata: { wallet: walletAddress, user: username },
+      }, {
+        onReadyForServerApproval: async (paymentId: string) => {
+          const response = await fetch('/api/pi/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId }),
+          });
+          if (!response.ok) throw new Error("Approval failed");
+          return response.json();
+        },
+        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+          const res = await fetch('/api/pi/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentId, txid }),
+          });
+          if (res.ok) {
+            showToast(lang === 'ar' ? "تم التفعيل!" : "Activated!", "success");
+            return res.json();
+          }
+        },
+        onCancel: () => showToast("Cancelled", "info"),
+        onError: (error: Error) => {
+          alert("Payment Error: " + error.message);
+          showToast("Payment Failed", "error");
+        },
+      });
+    } catch (err: any) {
+      alert("System Error: " + err.message);
+    }
+  }
+
+  const handleDisconnect = () => {
+    setIsConnected(false);
+    setWalletAddress("");
+    setBlockchainData(null);
+  }
 
   return (
-    <div className="min-h-screen bg-black overflow-x-hidden">
+    <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
       <AnimatePresence>
-        {toast && (
-          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl backdrop-blur-xl">
-            {toast.type === 'success' ? <CheckCircle2 className="text-green-500 w-5 h-5" /> : 
-             toast.type === 'error' ? <XCircle className="text-red-500 w-5 h-5" /> : 
-             <Info className="text-purple-500 w-5 h-5" />}
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">{toast.msg}</span>
+        {notification && (
+          <motion.div 
+            initial={{ y: 50, opacity: 0, x: "-50%" }} 
+            animate={{ y: 0, opacity: 1, x: "-50%" }} 
+            exit={{ y: 50, opacity: 0, x: "-50%" }}
+            className={`fixed bottom-10 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
+              notifType === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' :
+              notifType === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
+              'bg-purple-500/20 border-purple-500/50 text-purple-400'
+            }`}
+          >
+            <span className="text-xl">{notificationIcons[notifType]}</span>
+            <p className="font-bold text-sm tracking-wide">{notification}</p>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="fixed top-4 right-4 z-50 flex gap-2">
+        {['en', 'ar'].map((l) => (
+          <button 
+            key={l} 
+            onClick={() => setLang(l)} 
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800 text-gray-400'}`}
+          >
+            {l.toUpperCase()}
+          </button>
+        ))}
+      </div>
 
       <AnimatePresence mode="wait">
         {!isConnected ? (
@@ -95,11 +185,13 @@ export default function HomePage() {
             <EntryPage onConnect={handleConnect} />
           </motion.div>
         ) : (
-          <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Dashboard 
-               walletAddress={walletAddress} 
-               username={username} 
-               onDisconnect={() => setIsConnected(false)} 
+              walletAddress={walletAddress} 
+              username={username} 
+              data={blockchainData} 
+              onDisconnect={handleDisconnect}
+              onStartPayment={handlePayment} 
             />
           </motion.div>
         )}
