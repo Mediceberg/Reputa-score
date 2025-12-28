@@ -2,200 +2,138 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { EntryPage } from "@/components/entry-page"
-import { Dashboard } from "@/components/dashboard"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { TrustScoreGauge } from "@/components/trust-score-gauge"
+import { 
+  LogOut, Search, Crown, Loader2, CreditCard, 
+  ArrowDownLeft, ArrowUpRight, History, ShieldCheck, Zap, Activity
+} from "lucide-react"
 
-const notificationIcons = {
-  success: "✅",
-  error: "❌",
-  loading: "⏳",
-  info: "ℹ️"
-};
+export function Dashboard({ walletAddress, username, onDisconnect }: any) {
+  const [searchAddress, setSearchAddress] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [isPremium, setIsPremium] = useState(false) 
+  const [walletData, setWalletData] = useState<any>(null)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
-export default function HomePage() {
-  const [walletAddress, setWalletAddress] = useState<string>("")
-  const [username, setUsername] = useState<string>("") 
-  const [isConnected, setIsConnected] = useState(false)
-  const [blockchainData, setBlockchainData] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [lang, setLang] = useState('en')
-  const [notification, setNotification] = useState<string | null>(null)
-  const [notifType, setNotifType] = useState<keyof typeof notificationIcons>("info")
-
-  const showToast = useCallback((msg: string, type: keyof typeof notificationIcons) => {
-    setNotifType(type);
-    setNotification(msg);
-    if (type !== "loading") setTimeout(() => setNotification(null), 4000);
+  // طلب الصلاحيات فور الدخول للتأكد من عمل الـ SDK
+  useEffect(() => {
+    if ((window as any).Pi) {
+      (window as any).Pi.authenticate(["payments", "username"], () => {});
+    }
   }, []);
 
-  // --- 1. إصلاح نظام الربط التلقائي (الـ Auth) ---
-  useEffect(() => {
-    const loginToPi = async () => {
-      // التأكد من أننا داخل Pi Browser وأن الـ SDK جاهز
-      if (typeof window !== "undefined" && (window as any).Pi) {
-        try {
-          const Pi = (window as any).Pi;
-          
-          // طلب الصلاحيات بشكل صريح
-          const auth = await Pi.authenticate(['username', 'payments'], (payment: any) => {
-            console.log("Payment in progress:", payment);
-          });
-          
-          if (auth && auth.user) {
-            setUsername(auth.user.username); // هنا سيظهر الاسم أخيراً
-            console.log("Authenticated User:", auth.user.username);
-          }
-        } catch (error: any) {
-          console.error("Auth failed:", error);
-          // إذا ظهر لك خطأ هنا، فهذا يعني أنك لم تضف رابط التطبيق في Pi Developer Portal
-          showToast("Authentication Error", "error");
-        }
-      }
-    };
-
-    // إضافة تأخير بسيط للتأكد من تحميل الـ SDK في المتصفح
-    const timer = setTimeout(loginToPi, 1000);
-    return () => clearTimeout(timer);
-  }, [showToast]);
-
-  // --- 2. منطق فحص المحفظة ---
-  const handleConnect = async (address: string) => {
-    setIsLoading(true);
-    showToast(lang === 'ar' ? "جاري مزامنة حسابك..." : "Syncing account...", "loading");
-    
+  const performSearch = useCallback(async (address: string) => {
+    if (!address.startsWith('G')) return;
+    setIsSearching(true);
     try {
-      const response = await fetch('/api/wallet/check', {
+      const res = await fetch('/api/wallet/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
       });
-
-      const data = await response.json();
-
-      if (data.isValid) {
-        setBlockchainData(data);
-        setWalletAddress(address);
-        setIsConnected(true);
-        setNotification(null);
-      } else {
-        showToast(data.message || "Invalid Wallet", "error");
-      }
-    } catch (error) {
-      showToast("Blockchain Error", "error");
+      const data = await res.json();
+      if (data.isValid) setWalletData(data);
     } finally {
-      setIsLoading(false);
+      setIsSearching(false);
     }
-  }
+  }, []);
 
-  // --- 3. منطق الدفع (مع إضافة تنبيهات لكشف العطل) ---
-  const handlePayment = async () => {
-    // اختبار أولي: هل الدالة تُستدعى؟
-    console.log("Button clicked, initiating payment...");
-
-    if (!(window as any).Pi) {
-      alert("Pi SDK not detected!");
-      return;
-    }
-
-    if (!username) {
-      alert("User not authenticated. Please restart Pi Browser.");
-      return;
-    }
-
-    try {
-      showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
-      
-      await (window as any).Pi.createPayment({
-        amount: 1,
-        memo: `Reputation report for ${username}`,
-        metadata: { wallet: walletAddress, user: username },
-      }, {
-        onReadyForServerApproval: async (paymentId: string) => {
-          const response = await fetch('/api/pi/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId }),
-          });
-          if (!response.ok) throw new Error("Approval failed");
-          return response.json();
-        },
-        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          const res = await fetch('/api/pi/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId, txid }),
-          });
-          if (res.ok) {
-            showToast(lang === 'ar' ? "تم التفعيل!" : "Activated!", "success");
-            return res.json();
-          }
-        },
-        onCancel: () => showToast("Cancelled", "info"),
-        onError: (error: Error) => {
-          alert("Payment Error: " + error.message);
-          showToast("Payment Failed", "error");
-        },
-      });
-    } catch (err: any) {
-      alert("System Error: " + err.message);
-    }
-  }
-
-  const handleDisconnect = () => {
-    setIsConnected(false);
-    setWalletAddress("");
-    setBlockchainData(null);
-  }
+  useEffect(() => { if (walletAddress) performSearch(walletAddress); }, [walletAddress, performSearch]);
 
   return (
-    <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
-      <AnimatePresence>
-        {notification && (
-          <motion.div 
-            initial={{ y: 50, opacity: 0, x: "-50%" }} 
-            animate={{ y: 0, opacity: 1, x: "-50%" }} 
-            exit={{ y: 50, opacity: 0, x: "-50%" }}
-            className={`fixed bottom-10 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
-              notifType === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' :
-              notifType === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
-              'bg-purple-500/20 border-purple-500/50 text-purple-400'
-            }`}
-          >
-            <span className="text-xl">{notificationIcons[notifType]}</span>
-            <p className="font-bold text-sm tracking-wide">{notification}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="fixed top-4 right-4 z-50 flex gap-2">
-        {['en', 'ar'].map((l) => (
-          <button 
-            key={l} 
-            onClick={() => setLang(l)} 
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800 text-gray-400'}`}
-          >
-            {l.toUpperCase()}
-          </button>
-        ))}
+    <div className="min-h-screen p-4 md:p-8 bg-[#030303] text-zinc-100">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
+        <div>
+          <h1 className="text-xl font-bold tracking-tighter flex items-center gap-2">
+            <Zap className="w-5 h-5 text-purple-500 fill-purple-500" /> REPUTA PRO
+          </h1>
+          <p className="text-[10px] text-amber-500 font-mono italic">@{username || "Pioneer"}</p>
+        </div>
+        <Button onClick={onDisconnect} variant="ghost" className="text-zinc-500 hover:text-red-400">
+          <LogOut className="w-4 h-4 mr-2" /> Exit
+        </Button>
       </div>
 
-      <AnimatePresence mode="wait">
-        {!isConnected ? (
-          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <EntryPage onConnect={handleConnect} />
-          </motion.div>
-        ) : (
-          <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Dashboard 
-              walletAddress={walletAddress} 
-              username={username} 
-              data={blockchainData} 
-              onDisconnect={handleDisconnect}
-              onStartPayment={handlePayment} 
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Search */}
+          <div className="relative group">
+             <Input 
+               value={searchAddress} 
+               onChange={(e) => setSearchAddress(e.target.value)}
+               placeholder="Enter Wallet G..." 
+               className="h-14 bg-zinc-900/50 border-zinc-800 rounded-2xl pl-12 shadow-2xl transition-all focus:border-purple-500"
+             />
+             <Search className="absolute left-4 top-4 text-zinc-600 w-5 h-5" />
+             <Button onClick={() => performSearch(searchAddress)} className="absolute right-2 top-2 h-10 bg-purple-600">
+                {isSearching ? <Loader2 className="animate-spin w-4 h-4" /> : "Verify"}
+             </Button>
+          </div>
+
+          {walletData && (
+            <>
+              <TrustScoreGauge score={walletData.score} isPremium={isPremium} />
+              
+              {/* Transactions List - 10 ONLY & NON-ZERO */}
+              <div className="bg-zinc-900/30 p-6 rounded-[32px] border border-white/5 backdrop-blur-md">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><History className="w-4 h-4 text-purple-400" /> Recent Transactions</h3>
+                <div className="space-y-2">
+                  {walletData.transactions.map((tx: any, i: number) => (
+                    <div key={i} className="flex justify-between items-center p-3 bg-white/[0.02] hover:bg-white/[0.05] rounded-xl border border-white/5 transition-all">
+                      <div className="flex items-center gap-3">
+                        {tx.type === 'Received' ? <ArrowDownLeft className="text-green-500 w-4 h-4" /> : <ArrowUpRight className="text-zinc-500 w-4 h-4" />}
+                        <div>
+                          <p className="text-[11px] font-bold">{tx.type} <span className="text-zinc-500 font-normal">({tx.tokenName})</span></p>
+                          <p className="text-[9px] text-zinc-600 font-mono">{tx.date}</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-black text-purple-400">{tx.amount} π</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Sidebar - Audit & VIP */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className={`p-6 rounded-[32px] border transition-all duration-1000 ${isPremium ? 'bg-purple-900/10 border-purple-500/30 shadow-2xl shadow-purple-500/5' : 'bg-zinc-900/20 border-zinc-800'}`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-sm flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-green-500" /> Audit Report</h3>
+              {!isPremium && <span className="text-[9px] bg-zinc-800 px-2 py-0.5 rounded text-zinc-500 uppercase font-black">Locked</span>}
+            </div>
+
+            <div className="space-y-4">
+               {[
+                 { label: "Risk Analysis", val: "LOW", color: "text-green-400" },
+                 { label: "Account Age", val: walletData?.stats?.accountAge || "N/A", color: "text-blue-400" },
+                 { label: "Activity Level", val: "HIGH", color: "text-purple-400" }
+               ].map((item, id) => (
+                 <div key={id} className="relative group overflow-hidden">
+                    <div className="flex justify-between items-end pb-1 border-b border-white/5">
+                       <span className="text-[10px] text-zinc-500 uppercase font-bold">{item.label}</span>
+                       <span className={`text-xs font-black ${isPremium ? item.color : 'blur-sm select-none'}`}>{item.val}</span>
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+            {!isPremium && (
+              <Button 
+                onClick={() => {(window as any).onStartPayment()}}
+                className="w-full mt-8 h-12 bg-gradient-to-r from-amber-500 to-orange-600 text-black font-black rounded-2xl group hover:scale-[1.02] transition-transform"
+              >
+                <Crown className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" /> Upgrade for 1 Pi
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
