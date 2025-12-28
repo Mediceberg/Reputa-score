@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { EntryPage } from "@/components/entry-page"
 import { Dashboard } from "@/components/dashboard"
@@ -14,44 +14,48 @@ const notificationIcons = {
 
 export default function HomePage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
-  const [username, setUsername] = useState<string>("")
+  const [username, setUsername] = useState<string>("") // سيتم جلبه آلياً
   const [isConnected, setIsConnected] = useState(false)
   const [blockchainData, setBlockchainData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [lang, setLang] = useState('en')
-  
   const [notification, setNotification] = useState<string | null>(null)
   const [notifType, setNotifType] = useState<keyof typeof notificationIcons>("info")
 
-  // --- التحديث الجديد: المصادقة الإلزامية للوضع الحقيقي ---
+  const showToast = useCallback((msg: string, type: keyof typeof notificationIcons) => {
+    setNotifType(type);
+    setNotification(msg);
+    if (type !== "loading") setTimeout(() => setNotification(null), 4000);
+  }, []);
+
+  // --- 1. نظام الربط التلقائي (Auto-Connect & Authenticate) ---
   useEffect(() => {
-    const authenticatePi = async () => {
+    const loginToPi = async () => {
       if (typeof window !== "undefined" && window.Pi) {
         try {
           const scopes = ['username', 'payments'];
-          await window.Pi.authenticate(scopes, (payment) => {
-            console.log("Pi Authentication Success");
+          // جلب بيانات المستخدم الحقيقية فور فتح التطبيق
+          const auth = await window.Pi.authenticate(scopes, (payment) => {
+            console.log("Payment callback:", payment);
           });
+          
+          if (auth && auth.user) {
+            setUsername(auth.user.username); // تعيين اسم المستخدم الحقيقي من Pi
+            console.log("Connected as:", auth.user.username);
+          }
         } catch (error) {
-          console.error("Pi Authentication Error:", error);
+          console.error("Authentication failed:", error);
+          showToast("Please open via Pi Browser", "error");
         }
       }
     };
-    authenticatePi();
-  }, []);
-  // --------------------------------------------------
+    loginToPi();
+  }, [showToast]);
 
-  const showToast = (msg: string, type: keyof typeof notificationIcons) => {
-    setNotifType(type);
-    setNotification(msg);
-    if (type !== "loading") {
-      setTimeout(() => setNotification(null), 4000);
-    }
-  };
-
-  const handleConnect = async (address: string, piUsername?: string) => {
+  // --- 2. منطق فحص المحفظة ---
+  const handleConnect = async (address: string) => {
     setIsLoading(true);
-    showToast(lang === 'ar' ? "جاري فحص البلوكشين..." : "Scanning Blockchain...", "loading");
+    showToast(lang === 'ar' ? "جاري مزامنة حسابك..." : "Syncing account...", "loading");
     
     try {
       const response = await fetch('/api/wallet/check', {
@@ -65,79 +69,67 @@ export default function HomePage() {
       if (data.isValid) {
         setBlockchainData(data);
         setWalletAddress(address);
-        if (piUsername) setUsername(piUsername);
         setIsConnected(true);
         setNotification(null);
       } else {
-        showToast(data.message || "Wallet not found", "error");
+        showToast(data.message || "Invalid Wallet", "error");
       }
     } catch (error) {
-      showToast("Connection Error", "error");
+      showToast("Blockchain Error", "error");
     } finally {
       setIsLoading(false);
     }
   }
 
+  // --- 3. منطق الدفع الاحترافي ---
   const handlePayment = async () => {
     try {
-      showToast(lang === 'ar' ? "جاري تحضير الدفع..." : "Preparing Payment...", "loading");
+      showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
       
-      // تأكد من وجود المحفظة قبل بدء الدفع
-      if (!walletAddress) {
-        showToast("Wallet address missing", "error");
-        return;
-      }
-
       await window.Pi.createPayment({
         amount: 1,
-        memo: "Reputa Detailed Report Access",
-        metadata: { wallet: walletAddress },
+        memo: `Reputation report for ${username}`,
+        metadata: { wallet: walletAddress, user: username },
       }, {
         onReadyForServerApproval: async (paymentId: string) => {
-          // استخدام المسار المطلق لضمان الاستجابة في Vercel
-          const response = await fetch(`${window.location.origin}/api/pi/approve`, {
+          return await fetch(`${window.location.origin}/api/pi/approve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
-          });
-          return response.json();
+          }).then(res => res.json());
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          const response = await fetch(`${window.location.origin}/api/pi/complete`, {
+          const res = await fetch(`${window.location.origin}/api/pi/complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           });
-          showToast(lang === 'ar' ? "تم فتح التقرير بنجاح!" : "Full Report Unlocked!", "success");
-          return response.json();
+          showToast(lang === 'ar' ? "تم التفعيل بنجاح!" : "Activated Successfully!", "success");
+          return res.json();
         },
-        onCancel: (paymentId: string) => showToast("Payment Cancelled", "info"),
-        onError: (error: Error) => {
-          console.error("Payment Error:", error);
+        onCancel: () => showToast("Cancelled", "info"),
+        onError: (err: any) => {
+          console.error(err);
           showToast("Payment Failed", "error");
         },
       });
     } catch (err) {
-      showToast("Payment Process Error", "error");
+      showToast("Payment Error", "error");
     }
   }
 
   const handleDisconnect = () => {
-    setIsConnected(false)
-    setWalletAddress("")
-    setUsername("")
-    setBlockchainData(null)
+    setIsConnected(false);
+    setWalletAddress("");
+    setBlockchainData(null);
   }
 
   return (
     <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
-      
+      {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
-          <motion.div 
-            initial={{ y: 50, opacity: 0, x: "-50%" }}
-            animate={{ y: 0, opacity: 1, x: "-50%" }}
-            exit={{ y: 50, opacity: 0, x: "-50%" }}
+          <motion.div initial={{ y: 50, opacity: 0, x: "-50%" }} animate={{ y: 0, opacity: 1, x: "-50%" }} exit={{ y: 50, opacity: 0, x: "-50%" }}
             className={`fixed bottom-10 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
               notifType === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' :
               notifType === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
@@ -150,28 +142,14 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
+      {/* Language Switcher */}
       <div className="fixed top-4 right-4 z-50 flex gap-2">
-        {['en', 'ar', 'fr'].map((l) => (
-          <button 
-            key={l} 
-            onClick={() => setLang(l)} 
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700'}`}
-          >
+        {['en', 'ar'].map((l) => (
+          <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
             {l.toUpperCase()}
           </button>
         ))}
       </div>
-
-      {isLoading && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-purple-400 font-black animate-pulse uppercase tracking-widest">
-              {lang === 'ar' ? 'جاري الاتصال بالبلوكشين' : 'Syncing Blockchain'}
-            </p>
-          </div>
-        </div>
-      )}
 
       <AnimatePresence mode="wait">
         {!isConnected ? (
@@ -182,7 +160,7 @@ export default function HomePage() {
           <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Dashboard 
               walletAddress={walletAddress} 
-              username={username} 
+              username={username} // يمرر الاسم الحقيقي هنا
               data={blockchainData} 
               onDisconnect={handleDisconnect}
               onStartPayment={handlePayment} 
