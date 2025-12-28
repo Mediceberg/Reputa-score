@@ -1,16 +1,13 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { TrustScoreGauge } from "@/components/trust-score-gauge"
-import { TierCards } from "@/components/tier-cards"
-import { TransactionChart } from "@/components/transaction-chart"
-import { Sandbox } from "@/components/sandbox"
-import { LogOut, Settings, Search, Crown, Loader2, AlertCircle, CreditCard, ArrowDownLeft, ArrowUpRight, History } from "lucide-react"
+import { 
+  LogOut, Search, Crown, Loader2, AlertCircle, 
+  CreditCard, ArrowDownLeft, ArrowUpRight, History, Activity
+} from "lucide-react"
 
+// تعريف واجهة البيانات لضمان عدم وجود أخطاء TypeScript في GitHub
 interface DashboardProps {
   walletAddress: string
   username?: string
@@ -19,17 +16,16 @@ interface DashboardProps {
 }
 
 export function Dashboard({ walletAddress, username, onDisconnect, onPay }: DashboardProps) {
-  const [showSandbox, setShowSandbox] = useState(false)
   const [searchAddress, setSearchAddress] = useState("")
   const [isSearching, setIsSearching] = useState(false)
-  const [isPremium, setIsPremium] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
   const [walletData, setWalletData] = useState<any>(null)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [isPremium, setIsPremium] = useState(false)
 
-  // 1. محرك البحث الحقيقي المرتبط بـ API الخاص بك
+  // محرك البحث الحقيقي المرتبط بالـ API الخاص بك
   const performSearch = useCallback(async (address: string) => {
-    if (!address.startsWith('G')) {
-      setSearchError("Please enter a valid Pi wallet address");
+    if (!address || !address.startsWith('G')) {
+      setSearchError("Please enter a valid Pi wallet address (Starting with G)");
       return;
     }
 
@@ -48,136 +44,113 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
       if (data.isValid) {
         setWalletData(data);
       } else {
-        setSearchError(data.message || "Wallet not found");
+        setSearchError(data.message || "Wallet not found on Pi Network");
       }
     } catch (error) {
-      setSearchError("Connection to Pi Blockchain failed");
+      setSearchError("Blockchain connection failed. Try again.");
     } finally {
       setIsSearching(false);
     }
   }, []);
 
-  // البحث التلقائي عن محفظة الرائد المسجل فور الدخول
+  // تنفيذ البحث التلقائي عند الدخول
   useEffect(() => {
     if (walletAddress) performSearch(walletAddress);
   }, [walletAddress, performSearch]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    performSearch(searchAddress);
-  }
-
   return (
-    <div className="min-h-screen p-4 pb-20 md:p-6">
-      {/* Header -保持原样 */}
-      <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center justify-between mb-6">
-        <div>
+    <div className="min-h-screen bg-black text-white p-4 md:p-8 font-sans">
+      
+      {/* 1. Header Section */}
+      <header className="flex justify-between items-center mb-8 bg-zinc-900/40 p-5 rounded-3xl border border-white/5 backdrop-blur-md">
+        <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-amber-500 bg-clip-text text-transparent">REPUTA</h1>
+            <h1 className="text-2xl font-black tracking-tighter text-purple-500">REPUTA</h1>
             {isPremium && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-purple-600 to-amber-600 text-[10px] font-bold text-white shadow-glow">
+              <span className="bg-amber-500 text-black text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                 <Crown className="w-3 h-3" /> PREMIUM
               </span>
             )}
           </div>
-          {username && <p className="text-sm text-amber-500 font-medium">@{username}</p>}
-          <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[150px]">{walletAddress}</p>
+          <p className="text-xs text-zinc-500 font-mono opacity-70">{walletAddress.substring(0, 20)}...</p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Button onClick={onPay} className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-9 text-xs">
-            <CreditCard className="w-3 h-3 mr-2" /> Pi Pay
-          </Button>
-          <Button variant="outline" size="icon" onClick={onDisconnect} className="border-white/10 hover:bg-red-500/10"><LogOut className="w-4 h-4" /></Button>
+        
+        <div className="flex gap-2">
+          <button onClick={onPay} className="bg-amber-500 hover:bg-amber-600 text-black px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2">
+            <CreditCard className="w-4 h-4" /> 1 Pi
+          </button>
+          <button onClick={onDisconnect} className="bg-zinc-800 hover:bg-red-500/20 p-2 rounded-xl border border-white/5 transition-colors text-zinc-400 hover:text-red-500">
+            <LogOut className="w-5 h-5" />
+          </button>
         </div>
-      </motion.div>
+      </header>
 
-      {/* Search Section - المحرك الحقيقي */}
-      <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-6">
-        <form onSubmit={handleSearchSubmit} className="glass rounded-2xl p-4 border border-white/5">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Paste any G... wallet address"
-              value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
-              className="bg-black/20 border-white/10 focus:border-purple-500"
-            />
-            <Button type="submit" disabled={isSearching} className="bg-purple-600">
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            </Button>
-          </div>
-          {searchError && <div className="mt-2 text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{searchError}</div>}
-        </form>
-      </motion.div>
+      {/* 2. Search Bar */}
+      <div className="max-w-xl mx-auto mb-10">
+        <div className="relative group">
+          <input 
+            type="text"
+            placeholder="Search Wallet Address (G...)"
+            value={searchAddress}
+            onChange={(e) => setSearchAddress(e.target.value)}
+            className="w-full bg-zinc-900/60 border border-white/10 rounded-2xl py-4 px-6 outline-none focus:border-purple-500/50 transition-all text-sm"
+          />
+          <button 
+            onClick={() => performSearch(searchAddress)}
+            disabled={isSearching}
+            className="absolute right-3 top-3 bg-purple-600 hover:bg-purple-500 p-2 rounded-lg transition-colors"
+          >
+            {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+          </button>
+        </div>
+        {searchError && <p className="text-red-500 text-[11px] mt-2 ml-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {searchError}</p>}
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-9 space-y-6">
-          
-          {/* Gauge - عرض السكور الحقيقي */}
-          <AnimatePresence mode="wait">
-            {walletData && (
-              <motion.div key={walletData.score} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                <TrustScoreGauge score={walletData.score} isPremium={isPremium} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Real Transactions List - عرض المعاملات الحقيقية */}
-          {walletData && (
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass rounded-2xl p-6 border border-white/5 shadow-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="flex items-center gap-2 font-bold text-lg"><History className="text-purple-500 w-5 h-5" /> Transactions History</h3>
-                <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-1 rounded-full border border-green-500/20">On-Chain Verified</span>
+      {/* 3. Main Data View */}
+      <AnimatePresence mode="wait">
+        {walletData ? (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6"
+          >
+            {/* Score Card */}
+            <div className="bg-zinc-900/40 border border-white/5 rounded-[40px] p-10 text-center flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-30"></div>
+              <p className="text-zinc-500 text-xs uppercase tracking-[0.2em] mb-4">Reputation Score</p>
+              <h2 className="text-8xl font-black text-white drop-shadow-2xl">{walletData.score}</h2>
+              <div className="mt-6 inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 px-4 py-1.5 rounded-full text-purple-400 text-xs font-bold">
+                <Activity className="w-3 h-3" /> Active Pioneer
               </div>
+            </div>
+
+            {/* Transactions View */}
+            <div className="bg-zinc-900/20 border border-white/5 rounded-[40px] p-8">
+              <h3 className="text-sm font-bold text-zinc-400 mb-6 flex items-center gap-2">
+                <History className="w-4 h-4" /> Live Transactions
+              </h3>
               <div className="space-y-3">
                 {walletData.transactions.map((tx: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors border border-white/5">
+                  <div key={i} className="flex justify-between items-center p-4 bg-zinc-900/50 rounded-2xl border border-white/[0.03]">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${tx.type === 'استلام' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {tx.type === 'استلام' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm">{tx.type}</p>
-                        <p className="text-[10px] text-muted-foreground">{tx.date}</p>
-                      </div>
+                      {tx.type === 'استلام' ? 
+                        <div className="bg-green-500/10 p-2 rounded-lg text-green-500"><ArrowDownLeft className="w-4 h-4" /></div> : 
+                        <div className="bg-red-500/10 p-2 rounded-lg text-red-500"><ArrowUpRight className="w-4 h-4" /></div>
+                      }
+                      <span className="text-xs font-bold">{tx.type}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-purple-400">{tx.amount} π</p>
-                    </div>
+                    <span className="font-mono text-sm font-bold text-purple-400">{tx.amount} π</span>
                   </div>
                 ))}
               </div>
-            </motion.div>
-          )}
-
-          {/* Premium Detailed Report */}
-          {isPremium && (
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 rounded-2xl bg-gradient-to-br from-purple-900/20 to-amber-900/20 border border-amber-500/30">
-                <h3 className="text-amber-500 font-bold mb-4 flex items-center gap-2"><Crown className="w-4 h-4"/> Advanced Analytics Report</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">Activity Rank</p>
-                    <p className="font-bold text-sm">Top 5%</p>
-                  </div>
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">Risk Factor</p>
-                    <p className="font-bold text-sm text-green-500">Low</p>
-                  </div>
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">Wallet Age</p>
-                    <p className="font-bold text-sm">Verified</p>
-                  </div>
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">DEX Score</p>
-                    <p className="font-bold text-sm">88/100</p>
-                  </div>
-                </div>
-             </motion.div>
-          )}
-
-          <TierCards currentScore={walletData?.score || 0} />
-        </div>
-      </div>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="text-center py-20 text-zinc-700 uppercase tracking-widest text-xs animate-pulse">
+            Waiting for blockchain data...
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
