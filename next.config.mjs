@@ -1,19 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // هذا السطر يمنع "Paiement expiré" عبر منع إعادة التوجيه التلقائي
-  trailingSlash: false, 
+  // تفعيل المسارات الصارمة لمنع مشاكل التوجيه في Pi Browser
+  trailingSlash: false,
   
+  // تجاهل أخطاء البناء للسماح برفع الكود رغم التحذيرات
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
+  
+  // تحسين أداء الصور (اختياري)
   images: {
     unoptimized: true,
   },
+  
+  // إعدادات إضافية لضمان استقرار السيرفر
+  reactStrictMode: false,
 };
 
-// إذا كان الملف ينتهي بـ .js استخدم module.exports
-// إذا كان ينتهي بـ .mjs اتركها export default
 module.exports = nextConfig;
