@@ -1,20 +1,31 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const { paymentId } = await request.json();
-    
-    // إرسال موافقة فورية لمنصة Pi قبل انتهاء الـ 30 ثانية
-    await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
-      method: 'POST',
+    const { paymentId } = await req.json();
+    const apiKey = process.env.PI_API_KEY;
+
+    if (!apiKey) {
+      return NextResponse.json({ error: "PI_API_KEY_NOT_FOUND" }, { status: 500 });
+    }
+
+    // إرسال الموافقة لمنصة Pi في أقل من ثانيتين لتجنب انتهاء الصلاحية
+    const response = await fetch(`https://api.minepi.com/v2/payments/${paymentId}/approve`, {
+      method: "POST",
       headers: { 
-        'Authorization': `Key ${process.env.PI_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+        "Authorization": `Key ${apiKey}`, 
+        "Content-Type": "application/json" 
+      },
     });
 
-    return NextResponse.json({ message: "Approved" }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: "Approval Failed" }, { status: 500 });
+    if (response.ok) {
+      return NextResponse.json({ success: true, message: "Approved Successfully" }, { status: 200 });
+    } else {
+      const errorText = await response.text();
+      return NextResponse.json({ error: "Pi_API_REJECTED", details: errorText }, { status: 400 });
+    }
+
+  } catch (error: any) {
+    return NextResponse.json({ error: "SERVER_ERROR", message: error.message }, { status: 500 });
   }
 }
