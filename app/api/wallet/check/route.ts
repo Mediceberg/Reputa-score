@@ -3,56 +3,61 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const { walletAddress } = await request.json();
-    if (!walletAddress?.startsWith('G')) return NextResponse.json({ isValid: false, message: "عنوان غير صحيح" });
+    if (!walletAddress?.startsWith('G')) return NextResponse.json({ isValid: false, message: "Invalid Address" });
 
-    // جلب بيانات الحساب + آخر 20 معاملة لتعميق التحليل
+    // جلب البيانات من Testnet
     const [accRes, opsRes] = await Promise.all([
       fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}`, { cache: 'no-store' }),
-      fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}/operations?limit=20&order=desc`, { cache: 'no-store' })
+      fetch(`https://api.testnet.minepi.com/accounts/${walletAddress}/operations?limit=50&order=desc`, { cache: 'no-store' })
     ]);
 
-    if (!accRes.ok) return NextResponse.json({ isValid: false, message: "المحفظة غير موجودة في الشبكة" });
+    if (!accRes.ok) return NextResponse.json({ isValid: false, message: "Wallet not found on Network" });
 
     const accData = await accRes.json();
     const opsData = await opsRes.json();
 
     const balance = parseFloat(accData.balances.find((b: any) => b.asset_type === 'native')?.balance || "0");
-    const sequence = accData.sequence; // عدد المعاملات الكلية المرسلة
-    const transactions = opsData._embedded.records;
+    const sequence = parseInt(accData.sequence);
+    const allOps = opsData._embedded.records;
 
-    // --- بروتوكول السمعة المطور (Reputation Protocol v2) ---
-    // 1. وزن الرصيد (30%): كل 1000 باي تعطي 30 نقطة كحد أقصى
-    const balanceScore = Math.min(30, (balance / 1000) * 30);
-    
-    // 2. وزن النشاط التاريخي (40%): يعتمد على الـ Sequence
-    const activityScore = Math.min(40, (sequence / 50) * 40);
-    
-    // 3. وزن التفاعل الأخير (30%): يعتمد على عدد العمليات في السجل الحالي
-    const recencyScore = Math.min(30, (transactions.length / 20) * 30);
+    // 1. تصفية المعاملات الصفرية واختيار أول 10 فقط
+    const filteredTransactions = allOps
+      .filter((op: any) => {
+        const amount = parseFloat(op.amount || "0");
+        return amount > 0 || op.type === 'create_account'; // استبعاد المعاملات الصفرية إلا إذا كانت إنشاء حساب
+      })
+      .slice(0, 10) // جلب 10 فقط
+      .map((op: any) => ({
+        id: op.id.substring(0, 8),
+        // تحويل الأنواع للإنجليزية وتفصيلها
+        type: op.type === 'payment' 
+          ? (op.from === walletAddress ? 'Sent' : 'Received') 
+          : (op.type === 'create_account' ? 'Account Created' : 'Contract Interaction'),
+        amount: op.amount || '0',
+        tokenName: "Pi Token", // يمكنك لاحقاً تطوير هذا لجلب أسماء توكنات أخرى
+        date: new Date(op.created_at).toLocaleString('en-US', { 
+          hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' 
+        })
+      }));
 
-    const totalScore = Math.floor(balanceScore + activityScore + recencyScore);
-
-    // تنظيم بيانات المعاملات بشكل مفصل
-    const formattedTransactions = transactions.map((op: any) => ({
-      id: op.id.substring(0, 8),
-      type: op.type === 'payment' ? (op.from === walletAddress ? 'إرسال' : 'استلام') : 'تفاعل عقد',
-      amount: op.amount || '0',
-      from: op.from || 'System',
-      to: op.to || walletAddress,
-      date: new Date(op.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
-    }));
+    // بروتوكول السمعة
+    const totalScore = Math.floor(
+      Math.min(30, (balance / 1000) * 30) + 
+      Math.min(40, (sequence / 50) * 40) + 
+      Math.min(30, (filteredTransactions.length / 10) * 30)
+    );
 
     return NextResponse.json({ 
       isValid: true, 
       balance: balance.toFixed(2), 
       score: totalScore, 
-      transactions: formattedTransactions,
+      transactions: filteredTransactions,
       stats: {
         totalOps: sequence,
-        accountAge: accData.paging_token ? "قديم" : "جديد"
+        accountAge: sequence > 10 ? "Established" : "New Account"
       }
     });
   } catch (e) { 
-    return NextResponse.json({ error: "فشل في الاتصال بالبلوكشين" }, { status: 500 }); 
+    return NextResponse.json({ error: "Blockchain Connection Failed" }, { status: 500 }); 
   }
 }
