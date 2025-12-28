@@ -23,6 +23,24 @@ export default function HomePage() {
   const [notification, setNotification] = useState<string | null>(null)
   const [notifType, setNotifType] = useState<keyof typeof notificationIcons>("info")
 
+  // --- التحديث الجديد: المصادقة الإلزامية للوضع الحقيقي ---
+  useEffect(() => {
+    const authenticatePi = async () => {
+      if (typeof window !== "undefined" && window.Pi) {
+        try {
+          const scopes = ['username', 'payments'];
+          await window.Pi.authenticate(scopes, (payment) => {
+            console.log("Pi Authentication Success");
+          });
+        } catch (error) {
+          console.error("Pi Authentication Error:", error);
+        }
+      }
+    };
+    authenticatePi();
+  }, []);
+  // --------------------------------------------------
+
   const showToast = (msg: string, type: keyof typeof notificationIcons) => {
     setNotifType(type);
     setNotification(msg);
@@ -64,31 +82,40 @@ export default function HomePage() {
     try {
       showToast(lang === 'ar' ? "جاري تحضير الدفع..." : "Preparing Payment...", "loading");
       
-      const payment = await window.Pi.createPayment({
+      // تأكد من وجود المحفظة قبل بدء الدفع
+      if (!walletAddress) {
+        showToast("Wallet address missing", "error");
+        return;
+      }
+
+      await window.Pi.createPayment({
         amount: 1,
         memo: "Reputa Detailed Report Access",
         metadata: { wallet: walletAddress },
       }, {
-        // تعديل هام: إضافة return لضمان استجابة SDK في الوضع الحقيقي
         onReadyForServerApproval: async (paymentId: string) => {
-          const response = await fetch('/api/pi/approve', {
+          // استخدام المسار المطلق لضمان الاستجابة في Vercel
+          const response = await fetch(`${window.location.origin}/api/pi/approve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
           });
-          return response.json(); // يخبر التطبيق أن السيرفر أعطى الموافقة
+          return response.json();
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          const response = await fetch('/api/pi/complete', {
+          const response = await fetch(`${window.location.origin}/api/pi/complete`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           });
           showToast(lang === 'ar' ? "تم فتح التقرير بنجاح!" : "Full Report Unlocked!", "success");
-          return response.json(); // يخبر التطبيق أن العملية اكتملت
+          return response.json();
         },
         onCancel: (paymentId: string) => showToast("Payment Cancelled", "info"),
-        onError: (error: Error) => showToast("Payment Failed", "error"),
+        onError: (error: Error) => {
+          console.error("Payment Error:", error);
+          showToast("Payment Failed", "error");
+        },
       });
     } catch (err) {
       showToast("Payment Process Error", "error");
