@@ -34,7 +34,7 @@ export default function HomePage() {
       if (typeof window !== "undefined" && window.Pi) {
         try {
           const scopes = ['username', 'payments'];
-          const auth = await window.Pi.authenticate(scopes, (payment) => {
+          const auth = await window.Pi.authenticate(scopes, (payment: any) => {
             console.log("Payment callback status:", payment);
           });
           
@@ -80,7 +80,7 @@ export default function HomePage() {
     }
   }
 
-  // --- 3. منطق الدفع مع كاشف الأخطاء المدمج ---
+  // --- 3. منطق الدفع المعدل لضمان السرعة (الموافقة الفورية) ---
   const handlePayment = async () => {
     try {
       showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
@@ -96,12 +96,15 @@ export default function HomePage() {
         metadata: { wallet: walletAddress, user: username },
       }, {
         onReadyForServerApproval: async (paymentId: string) => {
+          // التعديل: إرسال الطلب وإرجاع الـ JSON فوراً لإيقاف العداد التنازلي
           const response = await fetch(`${window.location.origin}/api/pi/approve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
           });
-          return response.json();
+          
+          if (!response.ok) throw new Error("Approval failed on server");
+          return response.json(); // هذا السطر يمنع "Paiement expiré"
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
           const res = await fetch(`${window.location.origin}/api/pi/complete`, {
@@ -109,15 +112,18 @@ export default function HomePage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           });
-          showToast(lang === 'ar' ? "تم التفعيل بنجاح!" : "Activated Successfully!", "success");
-          return res.json();
+          
+          if (res.ok) {
+            showToast(lang === 'ar' ? "تم التفعيل بنجاح!" : "Activated Successfully!", "success");
+            return res.json();
+          }
+          throw new Error("Completion failed");
         },
         onCancel: () => showToast("Cancelled", "info"),
         
-        // --- إضافة كاشف الأخطاء هنا ---
         onError: (error: Error, paymentId?: string) => {
           console.error("Payment Error Details:", error);
-          // سيظهر تنبيه يوضح السبب التقني الدقيق للفشل
+          // تنبيه تقني يساعدنا في التشخيص إذا استمر العطل
           alert(`PI SDK ERROR: ${error.message} \nPaymentID: ${paymentId || 'N/A'}`);
           showToast("Payment Failed", "error");
         },
@@ -137,7 +143,10 @@ export default function HomePage() {
     <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
       <AnimatePresence>
         {notification && (
-          <motion.div initial={{ y: 50, opacity: 0, x: "-50%" }} animate={{ y: 0, opacity: 1, x: "-50%" }} exit={{ y: 50, opacity: 0, x: "-50%" }}
+          <motion.div 
+            initial={{ y: 50, opacity: 0, x: "-50%" }} 
+            animate={{ y: 0, opacity: 1, x: "-50%" }} 
+            exit={{ y: 50, opacity: 0, x: "-50%" }}
             className={`fixed bottom-10 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
               notifType === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' :
               notifType === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
@@ -152,7 +161,11 @@ export default function HomePage() {
 
       <div className="fixed top-4 right-4 z-50 flex gap-2">
         {['en', 'ar'].map((l) => (
-          <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800 text-gray-400'}`}>
+          <button 
+            key={l} 
+            onClick={() => setLang(l)} 
+            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800 text-gray-400'}`}
+          >
             {l.toUpperCase()}
           </button>
         ))}
