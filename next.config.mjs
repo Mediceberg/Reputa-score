@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // هذا السطر يمنع "Paiement expiré" عبر منع إعادة التوجيه التلقائي
+  trailingSlash: false, 
+  
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -9,6 +12,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-}
+};
 
-export default nextConfig
+// إذا كان الملف ينتهي بـ .js استخدم module.exports
+// إذا كان ينتهي بـ .mjs اتركها export default
+module.exports = nextConfig;
