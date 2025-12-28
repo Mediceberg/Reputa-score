@@ -11,113 +11,115 @@ export default function HomePage() {
   const [isConnected, setIsConnected] = useState(false)
   const [blockchainData, setBlockchainData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [language, setLanguage] = useState<'ar' | 'en' | 'fr'>('ar')
 
-  // دالة الدفع التي تمنع انتهاء الصلاحية
-  const startPayment = async (address: string) => {
-    try {
-      const payment = await window.Pi.createPayment({
-        amount: 1,
-        memo: "Reputa Protocol Analysis V3",
-        metadata: { walletAddress: address },
-      }, {
-        onReadyForServerApproval: async (paymentId: string) => {
-          // إرسال الموافقة الفورية للسيرفر لمنع خطأ Expired
-          await fetch('/api/pi/approve', {
-            method: 'POST',
-            body: JSON.stringify({ paymentId }),
-          });
-        },
-        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          // إتمام المعاملة نهائياً
-          await fetch('/api/pi/complete', {
-            method: 'POST',
-            body: JSON.stringify({ paymentId, txid }),
-          });
-          // بعد نجاح الدفع، نقوم بجلب البيانات العميقة
-          fetchBlockchainData(address);
-        },
-        onCancel: (paymentId: string) => console.log("Cancelled"),
-        onError: (error: Error, payment: any) => alert("Payment Error: " + error.message),
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  // دالة الدفع التي تضمن الربط والموافقة الفورية
+  const processPayment = async (address: string) => {
+    return new Promise((resolve, reject) => {
+      try {
+        window.Pi.createPayment({
+          amount: 1, // رسوم التقرير المعمق
+          memo: "Reputa Protocol V3 Analysis",
+          metadata: { walletAddress: address },
+        }, {
+          onReadyForServerApproval: async (paymentId: string) => {
+            // حل مشكلة انتهاء الصلاحية: إرسال إشارة الموافقة فوراً للسيرفر
+            await fetch('/api/pi/approve', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId }),
+            });
+          },
+          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
+            // تأكيد إتمام المعاملة
+            await fetch('/api/pi/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId, txid }),
+            });
+            resolve(true);
+          },
+          onCancel: (paymentId: string) => reject("Payment Cancelled"),
+          onError: (error: Error) => reject(error.message),
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  };
 
-  const fetchBlockchainData = async (address: string) => {
+  const handleConnect = async (address: string, piUsername?: string) => {
     setIsLoading(true);
     try {
+      // 1. أولاً: نقوم بمعالجة الدفع لضمان جدية المستخدم ومنع انتهاء الصلاحية
+      await processPayment(address);
+
+      // 2. ثانياً: بعد نجاح الدفع، نستدعي محرك التحقق الحقيقي
       const response = await fetch('/api/wallet/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
       });
+
       const data = await response.json();
+
       if (data.isValid) {
         setBlockchainData(data);
+        setWalletAddress(address);
+        if (piUsername) setUsername(piUsername);
         setIsConnected(true);
+      } else {
+        alert(data.message || "المحفظة غير موجودة على الشبكة");
       }
     } catch (error) {
-      alert("Blockchain Error");
+      // إذا فشل الدفع أو التحقق يظهر التنبيه
+      alert(typeof error === 'string' ? error : "فشل في إتمام العملية");
     } finally {
       setIsLoading(false);
     }
   }
 
-  const handleConnect = async (address: string, piUsername?: string) => {
-    setWalletAddress(address);
-    if (piUsername) setUsername(piUsername);
-    
-    // تشغيل نظام الدفع أولاً لفتح التقرير
-    await startPayment(address);
-  }
-
   const handleDisconnect = () => {
-    setIsConnected(false);
-    setWalletAddress("");
-    setBlockchainData(null);
+    setIsConnected(false)
+    setWalletAddress("")
+    setUsername("")
+    setBlockchainData(null)
   }
 
   return (
-    <div className={`min-h-screen bg-background relative ${language === 'ar' ? 'font-arabic' : ''}`}>
-      {/* شريط تبديل اللغات الاحترافي */}
-      <div className="absolute top-4 right-4 z-50 flex gap-2">
-        {['en', 'ar', 'fr'].map((lang) => (
-          <button 
-            key={lang} 
-            onClick={() => setLanguage(lang as any)}
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === lang ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400'}`}
-          >
-            {lang.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
+    <div className="min-h-screen bg-background relative">
       {isLoading && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="p-8 bg-gray-900 rounded-3xl border border-purple-500 shadow-2xl text-center">
-            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-white font-bold">
-              {language === 'ar' ? 'جاري تحليل بروتوكول السمعة...' : 'Analyzing Reputa Protocol...'}
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="p-6 bg-gray-900 rounded-2xl border border-purple-500 animate-pulse text-center">
+            <p className="text-white font-bold mb-2">جاري المعالجة الآمنة... 🛡️</p>
+            <p className="text-xs text-purple-300">يرجى عدم إغلاق التطبيق أثناء الدفع</p>
           </div>
         </div>
       )}
 
       <AnimatePresence mode="wait">
         {!isConnected ? (
-          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <EntryPage onConnect={handleConnect} language={language} />
+          <motion.div
+            key="entry"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <EntryPage onConnect={handleConnect} />
           </motion.div>
         ) : (
-          <motion.div key="dashboard" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <motion.div
+            key="dashboard"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.5 }}
+          >
             <Dashboard 
               walletAddress={walletAddress} 
               username={username} 
               data={blockchainData} 
-              onDisconnect={handleDisconnect}
-              language={language}
+              onDisconnect={handleDisconnect} 
             />
           </motion.div>
         )}
