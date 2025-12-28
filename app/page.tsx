@@ -9,51 +9,15 @@ export default function HomePage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
   const [username, setUsername] = useState<string>("")
   const [isConnected, setIsConnected] = useState(false)
+  
+  // حالات جديدة لتخزين بيانات البلوكشين الحقيقية
   const [blockchainData, setBlockchainData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
-
-  // دالة الدفع التي تضمن الربط والموافقة الفورية
-  const processPayment = async (address: string) => {
-    return new Promise((resolve, reject) => {
-      try {
-        window.Pi.createPayment({
-          amount: 1, // رسوم التقرير المعمق
-          memo: "Reputa Protocol V3 Analysis",
-          metadata: { walletAddress: address },
-        }, {
-          onReadyForServerApproval: async (paymentId: string) => {
-            // حل مشكلة انتهاء الصلاحية: إرسال إشارة الموافقة فوراً للسيرفر
-            await fetch('/api/pi/approve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId }),
-            });
-          },
-          onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-            // تأكيد إتمام المعاملة
-            await fetch('/api/pi/complete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId, txid }),
-            });
-            resolve(true);
-          },
-          onCancel: (paymentId: string) => reject("Payment Cancelled"),
-          onError: (error: Error) => reject(error.message),
-        });
-      } catch (e) {
-        reject(e);
-      }
-    });
-  };
 
   const handleConnect = async (address: string, piUsername?: string) => {
     setIsLoading(true);
     try {
-      // 1. أولاً: نقوم بمعالجة الدفع لضمان جدية المستخدم ومنع انتهاء الصلاحية
-      await processPayment(address);
-
-      // 2. ثانياً: بعد نجاح الدفع، نستدعي محرك التحقق الحقيقي
+      // استدعاء محرك التحقق الحقيقي الذي أنشأناه في السيرفر
       const response = await fetch('/api/wallet/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,6 +27,7 @@ export default function HomePage() {
       const data = await response.json();
 
       if (data.isValid) {
+        // إذا كانت المحفظة حقيقية، نقوم بتخزين بياناتها وتوصيل المستخدم
         setBlockchainData(data);
         setWalletAddress(address);
         if (piUsername) setUsername(piUsername);
@@ -71,8 +36,7 @@ export default function HomePage() {
         alert(data.message || "المحفظة غير موجودة على الشبكة");
       }
     } catch (error) {
-      // إذا فشل الدفع أو التحقق يظهر التنبيه
-      alert(typeof error === 'string' ? error : "فشل في إتمام العملية");
+      alert("خطأ في الاتصال بمحرك البلوكشين");
     } finally {
       setIsLoading(false);
     }
@@ -87,11 +51,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background relative">
+      {/* مؤشر تحميل أثناء التحقق من البلوكشين */}
       {isLoading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="p-6 bg-gray-900 rounded-2xl border border-purple-500 animate-pulse text-center">
-            <p className="text-white font-bold mb-2">جاري المعالجة الآمنة... 🛡️</p>
-            <p className="text-xs text-purple-300">يرجى عدم إغلاق التطبيق أثناء الدفع</p>
+          <div className="p-6 bg-gray-900 rounded-2xl border border-purple-500 animate-pulse">
+            <p className="text-white font-bold">جاري فحص البلوكشين... 🔍</p>
           </div>
         </div>
       )}
@@ -115,6 +79,7 @@ export default function HomePage() {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.5 }}
           >
+            {/* نمرر blockchainData إلى الـ Dashboard لعرض النقاط والمعاملات */}
             <Dashboard 
               walletAddress={walletAddress} 
               username={username} 
