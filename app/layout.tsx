@@ -18,20 +18,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* تحميل المكتبة باستراتيجية التفاعل الفوري */}
+        {/* تحميل مكتبة Pi SDK قبل أي تفاعل */}
         <Script 
           src="https://sdk.minepi.com/pi-sdk.js" 
           strategy="beforeInteractive" 
         />
+        
+        {/* تفعيل المكتبة بالوضع الرسمي لضمان الربط مع السيرفر */}
         <Script id="pi-sdk-init" strategy="afterInteractive">
           {`
             if (window.Pi) {
-              // إزالة وضع Sandbox لضمان الربط الحقيقي مع السيرفر
+              // تم إزالة sandbox: true لضمان إرسال طلبات الموافقة لملف /api/pi/approve
               window.Pi.init({ version: "2.0" });
-              console.log("Pi SDK Initialized Successfully");
+              console.log("Pi SDK Initialized: Real Mode Enabled");
             }
           `}
         </Script>
+        
         <style>{`
           html {
             font-family: ${GeistSans.style.fontFamily};
