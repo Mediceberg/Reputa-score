@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion"
 import { EntryPage } from "@/components/entry-page"
 import { Dashboard } from "@/components/dashboard"
 
-// أنواع الإشعارات وأيقوناتها
 const notificationIcons = {
   success: "✅",
   error: "❌",
@@ -21,11 +20,9 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [lang, setLang] = useState('en')
   
-  // حالات الإشعارات الجديدة
   const [notification, setNotification] = useState<string | null>(null)
   const [notifType, setNotifType] = useState<keyof typeof notificationIcons>("info")
 
-  // دالة إظهار الإشعارات المحسنة
   const showToast = (msg: string, type: keyof typeof notificationIcons) => {
     setNotifType(type);
     setNotification(msg);
@@ -34,7 +31,6 @@ export default function HomePage() {
     }
   };
 
-  // 1. منطق البحث والتحقق
   const handleConnect = async (address: string, piUsername?: string) => {
     setIsLoading(true);
     showToast(lang === 'ar' ? "جاري فحص البلوكشين..." : "Scanning Blockchain...", "loading");
@@ -53,7 +49,7 @@ export default function HomePage() {
         setWalletAddress(address);
         if (piUsername) setUsername(piUsername);
         setIsConnected(true);
-        setNotification(null); // إخفاء إشعار التحميل عند النجاح
+        setNotification(null);
       } else {
         showToast(data.message || "Wallet not found", "error");
       }
@@ -64,7 +60,6 @@ export default function HomePage() {
     }
   }
 
-  // 2. منطق الدفع (مع مسارات الموافقة الفورية لمنع Expired)
   const handlePayment = async () => {
     try {
       showToast(lang === 'ar' ? "جاري تحضير الدفع..." : "Preparing Payment...", "loading");
@@ -74,21 +69,23 @@ export default function HomePage() {
         memo: "Reputa Detailed Report Access",
         metadata: { wallet: walletAddress },
       }, {
+        // تعديل هام: إضافة return لضمان استجابة SDK في الوضع الحقيقي
         onReadyForServerApproval: async (paymentId: string) => {
-          // استدعاء ملف الموافقة الفوري
-          await fetch('/api/pi/approve', {
+          const response = await fetch('/api/pi/approve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
           });
+          return response.json(); // يخبر التطبيق أن السيرفر أعطى الموافقة
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          await fetch('/api/pi/complete', {
+          const response = await fetch('/api/pi/complete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           });
           showToast(lang === 'ar' ? "تم فتح التقرير بنجاح!" : "Full Report Unlocked!", "success");
+          return response.json(); // يخبر التطبيق أن العملية اكتملت
         },
         onCancel: (paymentId: string) => showToast("Payment Cancelled", "info"),
         onError: (error: Error) => showToast("Payment Failed", "error"),
@@ -108,7 +105,6 @@ export default function HomePage() {
   return (
     <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
       
-      {/* نظام الإشعارات العائم (UI/UX التحسيني) */}
       <AnimatePresence>
         {notification && (
           <motion.div 
@@ -127,7 +123,6 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* مفتاح تبديل اللغات */}
       <div className="fixed top-4 right-4 z-50 flex gap-2">
         {['en', 'ar', 'fr'].map((l) => (
           <button 
@@ -140,7 +135,6 @@ export default function HomePage() {
         ))}
       </div>
 
-      {/* شاشة التحميل المركزية */}
       {isLoading && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md">
           <div className="flex flex-col items-center gap-4">
