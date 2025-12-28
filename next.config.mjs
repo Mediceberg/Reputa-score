@@ -11,7 +11,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   
-  // تحسين أداء الصور (اختياري)
+  // تحسين أداء الصور
   images: {
     unoptimized: true,
   },
@@ -20,4 +20,4 @@ const nextConfig = {
   reactStrictMode: false,
 };
 
-module.exports = nextConfig;
+export default nextConfig;
