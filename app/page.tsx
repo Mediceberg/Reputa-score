@@ -14,7 +14,7 @@ const notificationIcons = {
 
 export default function HomePage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
-  const [username, setUsername] = useState<string>("") // سيتم جلبه آلياً
+  const [username, setUsername] = useState<string>("") 
   const [isConnected, setIsConnected] = useState(false)
   const [blockchainData, setBlockchainData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -28,23 +28,22 @@ export default function HomePage() {
     if (type !== "loading") setTimeout(() => setNotification(null), 4000);
   }, []);
 
-  // --- 1. نظام الربط التلقائي (Auto-Connect & Authenticate) ---
+  // --- 1. نظام الربط التلقائي وجلب البيانات الحقيقية ---
   useEffect(() => {
     const loginToPi = async () => {
       if (typeof window !== "undefined" && window.Pi) {
         try {
           const scopes = ['username', 'payments'];
-          // جلب بيانات المستخدم الحقيقية فور فتح التطبيق
           const auth = await window.Pi.authenticate(scopes, (payment) => {
-            console.log("Payment callback:", payment);
+            console.log("Payment callback status:", payment);
           });
           
           if (auth && auth.user) {
-            setUsername(auth.user.username); // تعيين اسم المستخدم الحقيقي من Pi
-            console.log("Connected as:", auth.user.username);
+            setUsername(auth.user.username);
+            console.log("Authenticated as:", auth.user.username);
           }
         } catch (error) {
-          console.error("Authentication failed:", error);
+          console.error("Auth Error:", error);
           showToast("Please open via Pi Browser", "error");
         }
       }
@@ -81,22 +80,28 @@ export default function HomePage() {
     }
   }
 
-  // --- 3. منطق الدفع الاحترافي ---
+  // --- 3. منطق الدفع مع كاشف الأخطاء المدمج ---
   const handlePayment = async () => {
     try {
       showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
       
+      if (!walletAddress) {
+        showToast("Wallet address missing", "error");
+        return;
+      }
+
       await window.Pi.createPayment({
         amount: 1,
         memo: `Reputation report for ${username}`,
         metadata: { wallet: walletAddress, user: username },
       }, {
         onReadyForServerApproval: async (paymentId: string) => {
-          return await fetch(`${window.location.origin}/api/pi/approve`, {
+          const response = await fetch(`${window.location.origin}/api/pi/approve`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
-          }).then(res => res.json());
+          });
+          return response.json();
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
           const res = await fetch(`${window.location.origin}/api/pi/complete`, {
@@ -108,8 +113,12 @@ export default function HomePage() {
           return res.json();
         },
         onCancel: () => showToast("Cancelled", "info"),
-        onError: (err: any) => {
-          console.error(err);
+        
+        // --- إضافة كاشف الأخطاء هنا ---
+        onError: (error: Error, paymentId?: string) => {
+          console.error("Payment Error Details:", error);
+          // سيظهر تنبيه يوضح السبب التقني الدقيق للفشل
+          alert(`PI SDK ERROR: ${error.message} \nPaymentID: ${paymentId || 'N/A'}`);
           showToast("Payment Failed", "error");
         },
       });
@@ -126,7 +135,6 @@ export default function HomePage() {
 
   return (
     <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
-      {/* Toast Notification */}
       <AnimatePresence>
         {notification && (
           <motion.div initial={{ y: 50, opacity: 0, x: "-50%" }} animate={{ y: 0, opacity: 1, x: "-50%" }} exit={{ y: 50, opacity: 0, x: "-50%" }}
@@ -142,14 +150,24 @@ export default function HomePage() {
         )}
       </AnimatePresence>
 
-      {/* Language Switcher */}
       <div className="fixed top-4 right-4 z-50 flex gap-2">
         {['en', 'ar'].map((l) => (
-          <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400'}`}>
+          <button key={l} onClick={() => setLang(l)} className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50' : 'bg-gray-800 text-gray-400'}`}>
             {l.toUpperCase()}
           </button>
         ))}
       </div>
+
+      {isLoading && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-purple-400 font-black animate-pulse uppercase tracking-widest">
+              {lang === 'ar' ? 'جاري الاتصال بالبلوكشين' : 'Syncing Blockchain'}
+            </p>
+          </div>
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {!isConnected ? (
@@ -160,7 +178,7 @@ export default function HomePage() {
           <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Dashboard 
               walletAddress={walletAddress} 
-              username={username} // يمرر الاسم الحقيقي هنا
+              username={username} 
               data={blockchainData} 
               onDisconnect={handleDisconnect}
               onStartPayment={handlePayment} 
