@@ -30,31 +30,33 @@ export default function HomePage() {
 
   // --- 1. إصلاح نظام الربط التلقائي (الـ Auth) ---
   useEffect(() => {
-    const initPi = async () => {
-      // التأكد من وجود Pi SDK في النافذة
+    const loginToPi = async () => {
+      // التأكد من أننا داخل Pi Browser وأن الـ SDK جاهز
       if (typeof window !== "undefined" && (window as any).Pi) {
         try {
           const Pi = (window as any).Pi;
-          const scopes = ['username', 'payments'];
           
-          // محاولة تسجيل الدخول
-          const auth = await Pi.authenticate(scopes, (payment: any) => {
-            console.log("Oncomplete payment callback", payment);
+          // طلب الصلاحيات بشكل صريح
+          const auth = await Pi.authenticate(['username', 'payments'], (payment: any) => {
+            console.log("Payment in progress:", payment);
           });
           
           if (auth && auth.user) {
-            setUsername(auth.user.username);
-            console.log("Success: Logged in as", auth.user.username);
+            setUsername(auth.user.username); // هنا سيظهر الاسم أخيراً
+            console.log("Authenticated User:", auth.user.username);
           }
         } catch (error: any) {
-          console.error("Auth Error:", error);
-          // إذا فشل الربط، سنظهر تنبيهاً لأن هذا هو سبب تعطل الزر
-          showToast(lang === 'ar' ? "فشل ربط حساب Pi" : "Pi Auth Failed", "error");
+          console.error("Auth failed:", error);
+          // إذا ظهر لك خطأ هنا، فهذا يعني أنك لم تضف رابط التطبيق في Pi Developer Portal
+          showToast("Authentication Error", "error");
         }
       }
     };
-    initPi();
-  }, [lang, showToast]);
+
+    // إضافة تأخير بسيط للتأكد من تحميل الـ SDK في المتصفح
+    const timer = setTimeout(loginToPi, 1000);
+    return () => clearTimeout(timer);
+  }, [showToast]);
 
   // --- 2. منطق فحص المحفظة ---
   const handleConnect = async (address: string) => {
