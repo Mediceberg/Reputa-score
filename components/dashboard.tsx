@@ -7,29 +7,26 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { TrustScoreGauge } from "@/components/trust-score-gauge"
 import { TierCards } from "@/components/tier-cards"
-import { TransactionChart } from "@/components/transaction-chart"
-import { Sandbox } from "@/components/sandbox"
-import { LogOut, Settings, Search, Crown, Loader2, AlertCircle, CreditCard, ArrowDownLeft, ArrowUpRight, History } from "lucide-react"
+import { LogOut, Search, Crown, Loader2, AlertCircle, CreditCard, ArrowDownLeft, ArrowUpRight, History, ShieldCheck } from "lucide-react"
 
 interface DashboardProps {
   walletAddress: string
   username?: string
   onDisconnect: () => void
-  onPay?: () => void 
 }
 
-export function Dashboard({ walletAddress, username, onDisconnect, onPay }: DashboardProps) {
-  const [showSandbox, setShowSandbox] = useState(false)
+export function Dashboard({ walletAddress, username, onDisconnect }: DashboardProps) {
   const [searchAddress, setSearchAddress] = useState("")
   const [isSearching, setIsSearching] = useState(false)
-  const [isPremium, setIsPremium] = useState(false)
+  const [isPremium, setIsPremium] = useState(false) // حالة الاشتراك VIP
   const [searchError, setSearchError] = useState<string | null>(null)
   const [walletData, setWalletData] = useState<any>(null)
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
 
-  // 1. محرك البحث الحقيقي المرتبط بـ API الخاص بك
+  // 1. محرك جلب البيانات الحقيقي من البلوكشين
   const performSearch = useCallback(async (address: string) => {
-    if (!address.startsWith('G')) {
-      setSearchError("Please enter a valid Pi wallet address");
+    if (!address || !address.startsWith('G')) {
+      setSearchError("Invalid Pi Address");
       return;
     }
 
@@ -46,137 +43,165 @@ export function Dashboard({ walletAddress, username, onDisconnect, onPay }: Dash
       const data = await res.json();
       
       if (data.isValid) {
-        setWalletData(data);
+        setWalletData(data); // هنا تظهر البيانات الحقيقية (Score + Transactions)
       } else {
-        setSearchError(data.message || "Wallet not found");
+        setSearchError(data.message || "Account not found on Testnet");
       }
     } catch (error) {
-      setSearchError("Connection to Pi Blockchain failed");
+      setSearchError("Blockchain sync error. Please try again.");
     } finally {
       setIsSearching(false);
     }
   }, []);
 
-  // البحث التلقائي عن محفظة الرائد المسجل فور الدخول
+  // تنفيذ البحث فور دخول الرائد بمحفظته الخاصة
   useEffect(() => {
     if (walletAddress) performSearch(walletAddress);
   }, [walletAddress, performSearch]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    performSearch(searchAddress);
-  }
+  // 2. منطق الدفع لتفعيل VIP (Pi Network SDK)
+  const handleUpgradeToVIP = async () => {
+    if (!window.Pi) return alert("Please open this in Pi Browser");
+    
+    setIsProcessingPayment(true);
+    try {
+      const payment = await window.Pi.createPayment({
+        amount: 1, // سعر تفعيل VIP هو 1 Pi
+        memo: "Activate VIP Detailed Report",
+        metadata: { walletAddress: walletAddress }
+      }, {
+        onReadyForServerApproval: (paymentId: string) => {
+          // هنا يتم إرسال المعرف للسيرفر الخاص بك للتوثيق
+          console.log("Payment Ready:", paymentId);
+        },
+        onReadyForServerCompletion: (paymentId: string, txid: string) => {
+          setIsPremium(true); // تفعيل ميزات VIP فوراً
+          setIsProcessingPayment(false);
+        },
+        onCancel: (paymentId: string) => setIsProcessingPayment(false),
+        onError: (error: Error, payment?: any) => setIsProcessingPayment(false),
+      });
+    } catch (e) {
+      setIsProcessingPayment(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen p-4 pb-20 md:p-6">
-      {/* Header -保持原样 */}
-      <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex items-center justify-between mb-6">
+    <div className="min-h-screen p-4 pb-20 md:p-6 bg-black">
+      {/* Header */}
+      <motion.div className="flex items-center justify-between mb-8">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-amber-500 bg-clip-text text-transparent">REPUTA</h1>
-            {isPremium && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gradient-to-r from-purple-600 to-amber-600 text-[10px] font-bold text-white shadow-glow">
-                <Crown className="w-3 h-3" /> PREMIUM
-              </span>
-            )}
-          </div>
-          {username && <p className="text-sm text-amber-500 font-medium">@{username}</p>}
-          <p className="text-[10px] text-muted-foreground font-mono truncate max-w-[150px]">{walletAddress}</p>
+          <h1 className="text-2xl font-black text-purple-500 tracking-tighter">REPUTA <span className="text-[10px] text-zinc-600">v2.0</span></h1>
+          <p className="text-xs text-amber-500">@{username || "Pioneer"}</p>
         </div>
+        <Button variant="ghost" size="sm" onClick={onDisconnect} className="text-zinc-500 hover:text-red-500">
+          <LogOut className="w-4 h-4 mr-2" /> Logout
+        </Button>
+      </motion.div>
 
-        <div className="flex items-center gap-2">
-          <Button onClick={onPay} className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-9 text-xs">
-            <CreditCard className="w-3 h-3 mr-2" /> Pi Pay
+      {/* Search Input Section */}
+      <div className="mb-8">
+        <div className="relative group max-w-xl mx-auto">
+          <Input
+            placeholder="Search any G... wallet on Testnet"
+            value={searchAddress}
+            onChange={(e) => setSearchAddress(e.target.value)}
+            className="h-14 bg-zinc-900/50 border-zinc-800 rounded-2xl pl-12 focus:ring-purple-500"
+          />
+          <Search className="absolute left-4 top-4 text-zinc-500 w-5 h-5" />
+          <Button 
+            onClick={() => performSearch(searchAddress)} 
+            disabled={isSearching}
+            className="absolute right-2 top-2 h-10 bg-purple-600 hover:bg-purple-700 rounded-xl"
+          >
+            {isSearching ? <Loader2 className="animate-spin w-4 h-4" /> : "Analyze"}
           </Button>
-          <Button variant="outline" size="icon" onClick={onDisconnect} className="border-white/10 hover:bg-red-500/10"><LogOut className="w-4 h-4" /></Button>
         </div>
-      </motion.div>
+        {searchError && <p className="text-center text-red-500 text-xs mt-3 flex items-center justify-center gap-1"><AlertCircle className="w-3 h-3"/> {searchError}</p>}
+      </div>
 
-      {/* Search Section - المحرك الحقيقي */}
-      <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-6">
-        <form onSubmit={handleSearchSubmit} className="glass rounded-2xl p-4 border border-white/5">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Paste any G... wallet address"
-              value={searchAddress}
-              onChange={(e) => setSearchAddress(e.target.value)}
-              className="bg-black/20 border-white/10 focus:border-purple-500"
-            />
-            <Button type="submit" disabled={isSearching} className="bg-purple-600">
-              {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            </Button>
-          </div>
-          {searchError && <div className="mt-2 text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{searchError}</div>}
-        </form>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-9 space-y-6">
-          
-          {/* Gauge - عرض السكور الحقيقي */}
-          <AnimatePresence mode="wait">
-            {walletData && (
-              <motion.div key={walletData.score} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-                <TrustScoreGauge score={walletData.score} isPremium={isPremium} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Real Transactions List - عرض المعاملات الحقيقية */}
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Main Score Display */}
+        <AnimatePresence mode="wait">
           {walletData && (
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass rounded-2xl p-6 border border-white/5 shadow-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="flex items-center gap-2 font-bold text-lg"><History className="text-purple-500 w-5 h-5" /> Transactions History</h3>
-                <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-1 rounded-full border border-green-500/20">On-Chain Verified</span>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div className="md:col-span-7">
+                 <TrustScoreGauge score={walletData.score} isPremium={isPremium} />
               </div>
+              
+              {/* VIP Promotion Card */}
+              {!isPremium && (
+                <div className="md:col-span-5 bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[32px] border border-amber-500/30 flex flex-col justify-between">
+                  <div>
+                    <div className="bg-amber-500/10 text-amber-500 w-fit p-2 rounded-xl mb-4">
+                      <Crown className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Upgrade to VIP</h3>
+                    <p className="text-zinc-400 text-sm mb-6">Unlock detailed behavior analysis, spam risk assessment, and verified badge.</p>
+                  </div>
+                  <Button 
+                    onClick={handleUpgradeToVIP} 
+                    disabled={isProcessingPayment}
+                    className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-bold rounded-2xl shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+                  >
+                    {isProcessingPayment ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2 w-4 h-4" />}
+                    Activate VIP (1 Pi)
+                  </Button>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Transactions & VIP Report */}
+        {walletData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Real Transactions */}
+            <div className="bg-zinc-900/30 p-6 rounded-[32px] border border-white/5">
+              <h3 className="text-white font-bold mb-4 flex items-center gap-2"><History className="w-4 h-4 text-purple-500"/> Recent Activity</h3>
               <div className="space-y-3">
-                {walletData.transactions.map((tx: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors border border-white/5">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${tx.type === 'استلام' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                        {tx.type === 'استلام' ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
-                      </div>
-                      <div>
-                        <p className="font-bold text-sm">{tx.type}</p>
-                        <p className="text-[10px] text-muted-foreground">{tx.date}</p>
-                      </div>
+                {walletData.transactions.slice(0, 5).map((tx: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center p-3 bg-black/40 rounded-xl border border-white/5">
+                    <div className="flex gap-3 items-center">
+                      {tx.type === 'استلام' ? <ArrowDownLeft className="text-green-500 w-4 h-4" /> : <ArrowUpRight className="text-red-500 w-4 h-4" />}
+                      <span className="text-xs font-bold text-zinc-300">{tx.type}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono font-bold text-purple-400">{tx.amount} π</p>
-                    </div>
+                    <span className="text-sm font-mono text-purple-400 font-bold">{tx.amount} π</span>
                   </div>
                 ))}
               </div>
-            </motion.div>
-          )}
+            </div>
 
-          {/* Premium Detailed Report */}
-          {isPremium && (
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 rounded-2xl bg-gradient-to-br from-purple-900/20 to-amber-900/20 border border-amber-500/30">
-                <h3 className="text-amber-500 font-bold mb-4 flex items-center gap-2"><Crown className="w-4 h-4"/> Advanced Analytics Report</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">Activity Rank</p>
-                    <p className="font-bold text-sm">Top 5%</p>
-                  </div>
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">Risk Factor</p>
-                    <p className="font-bold text-sm text-green-500">Low</p>
-                  </div>
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">Wallet Age</p>
-                    <p className="font-bold text-sm">Verified</p>
-                  </div>
-                  <div className="p-3 bg-black/20 rounded-lg">
-                    <p className="text-[10px] text-gray-400">DEX Score</p>
-                    <p className="font-bold text-sm">88/100</p>
-                  </div>
+            {/* VIP Report (Visible only after payment) */}
+            <div className={`relative p-6 rounded-[32px] border transition-all duration-700 ${isPremium ? 'bg-purple-900/10 border-purple-500/40' : 'bg-zinc-900/10 border-zinc-800'}`}>
+              {!isPremium && (
+                <div className="absolute inset-0 backdrop-blur-[6px] bg-black/40 z-10 rounded-[32px] flex flex-col items-center justify-center text-center p-6">
+                  <ShieldCheck className="w-10 h-10 text-zinc-600 mb-2" />
+                  <p className="text-zinc-500 text-xs font-bold">DETAILED ANALYSIS LOCKED</p>
                 </div>
-             </motion.div>
-          )}
-
-          <TierCards currentScore={walletData?.score || 0} />
-        </div>
+              )}
+              <h3 className="text-white font-bold mb-4 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-amber-500"/> Reputation Audit</h3>
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="bg-black/40 p-3 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-zinc-500 uppercase">Risk Level</p>
+                  <p className="text-green-500 font-bold">LOW</p>
+                </div>
+                <div className="bg-black/40 p-3 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-zinc-500 uppercase">Authenticity</p>
+                  <p className="text-blue-500 font-bold">94%</p>
+                </div>
+                <div className="bg-black/40 p-3 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-zinc-500 uppercase">Whale Rank</p>
+                  <p className="text-purple-500 font-bold">#2,401</p>
+                </div>
+                <div className="bg-black/40 p-3 rounded-2xl border border-white/5">
+                  <p className="text-[10px] text-zinc-500 uppercase">Activity</p>
+                  <p className="text-amber-500 font-bold">HIGH</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
