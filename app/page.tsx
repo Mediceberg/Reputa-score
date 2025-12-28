@@ -28,28 +28,33 @@ export default function HomePage() {
     if (type !== "loading") setTimeout(() => setNotification(null), 4000);
   }, []);
 
-  // --- 1. نظام الربط التلقائي وجلب البيانات الحقيقية ---
+  // --- 1. إصلاح نظام الربط التلقائي (الـ Auth) ---
   useEffect(() => {
-    const loginToPi = async () => {
-      if (typeof window !== "undefined" && window.Pi) {
+    const initPi = async () => {
+      // التأكد من وجود Pi SDK في النافذة
+      if (typeof window !== "undefined" && (window as any).Pi) {
         try {
+          const Pi = (window as any).Pi;
           const scopes = ['username', 'payments'];
-          const auth = await window.Pi.authenticate(scopes, (payment: any) => {
-            console.log("Payment callback status:", payment);
+          
+          // محاولة تسجيل الدخول
+          const auth = await Pi.authenticate(scopes, (payment: any) => {
+            console.log("Oncomplete payment callback", payment);
           });
           
           if (auth && auth.user) {
             setUsername(auth.user.username);
-            console.log("Authenticated as:", auth.user.username);
+            console.log("Success: Logged in as", auth.user.username);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Auth Error:", error);
-          showToast("Please open via Pi Browser", "error");
+          // إذا فشل الربط، سنظهر تنبيهاً لأن هذا هو سبب تعطل الزر
+          showToast(lang === 'ar' ? "فشل ربط حساب Pi" : "Pi Auth Failed", "error");
         }
       }
     };
-    loginToPi();
-  }, [showToast]);
+    initPi();
+  }, [lang, showToast]);
 
   // --- 2. منطق فحص المحفظة ---
   const handleConnect = async (address: string) => {
@@ -80,31 +85,37 @@ export default function HomePage() {
     }
   }
 
-  // --- 3. منطق الدفع المعدل لضمان السرعة (الموافقة الفورية) ---
+  // --- 3. منطق الدفع (مع إضافة تنبيهات لكشف العطل) ---
   const handlePayment = async () => {
+    // اختبار أولي: هل الدالة تُستدعى؟
+    console.log("Button clicked, initiating payment...");
+
+    if (!(window as any).Pi) {
+      alert("Pi SDK not detected!");
+      return;
+    }
+
+    if (!username) {
+      alert("User not authenticated. Please restart Pi Browser.");
+      return;
+    }
+
     try {
       showToast(lang === 'ar' ? "تأكيد العملية..." : "Confirming...", "loading");
       
-      if (!walletAddress) {
-        showToast("Wallet address missing", "error");
-        return;
-      }
-
-      await window.Pi.createPayment({
+      await (window as any).Pi.createPayment({
         amount: 1,
         memo: `Reputation report for ${username}`,
         metadata: { wallet: walletAddress, user: username },
       }, {
         onReadyForServerApproval: async (paymentId: string) => {
-          // استخدام مسار نسبي مباشر لضمان استجابة السيرفر
           const response = await fetch('/api/pi/approve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId }),
           });
-          
-          if (!response.ok) throw new Error("Approval failed on server");
-          return response.json(); 
+          if (!response.ok) throw new Error("Approval failed");
+          return response.json();
         },
         onReadyForServerCompletion: async (paymentId: string, txid: string) => {
           const res = await fetch('/api/pi/complete', {
@@ -112,23 +123,19 @@ export default function HomePage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ paymentId, txid }),
           });
-          
           if (res.ok) {
-            showToast(lang === 'ar' ? "تم التفعيل بنجاح!" : "Activated Successfully!", "success");
+            showToast(lang === 'ar' ? "تم التفعيل!" : "Activated!", "success");
             return res.json();
           }
-          throw new Error("Completion failed");
         },
         onCancel: () => showToast("Cancelled", "info"),
-        
-        onError: (error: Error, paymentId?: string) => {
-          console.error("Payment Error Details:", error);
-          alert(`PI SDK ERROR: ${error.message} \nPaymentID: ${paymentId || 'N/A'}`);
+        onError: (error: Error) => {
+          alert("Payment Error: " + error.message);
           showToast("Payment Failed", "error");
         },
       });
-    } catch (err) {
-      showToast("Payment Error", "error");
+    } catch (err: any) {
+      alert("System Error: " + err.message);
     }
   }
 
@@ -169,17 +176,6 @@ export default function HomePage() {
           </button>
         ))}
       </div>
-
-      {isLoading && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-md">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-purple-400 font-black animate-pulse uppercase tracking-widest text-center px-4">
-              {lang === 'ar' ? 'جاري الاتصال بالبلوكشين' : 'Syncing Blockchain'}
-            </p>
-          </div>
-        </div>
-      )}
 
       <AnimatePresence mode="wait">
         {!isConnected ? (
