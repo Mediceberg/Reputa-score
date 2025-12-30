@@ -1,10 +1,16 @@
-import { useState } from 'react';
-import { WalletChecker } from './components/WalletChecker';
-import { WalletAnalysis } from './components/WalletAnalysis';
-import { AccessUpgradeModal } from './components/AccessUpgradeModal';
+"use client" // إصلاح خطأ UseState: ضروري جداً لعمل الصفحات التفاعلية
 
+import React, { useState } from 'react';
 
-// Mock wallet data for demonstration
+// إصلاح المسارات: استخدام @ يضمن الوصول للمجلد الصحيح وتفادي خطأ Module Not Found
+import { WalletChecker } from '@/components/WalletChecker';
+import { WalletAnalysis } from '@/components/WalletAnalysis';
+import { AccessUpgradeModal } from '@/components/AccessUpgradeModal';
+
+// ملاحظة: تم حذف استيراد logoImage من Figma لأنه يسبب فشل البناء (Build Error)
+// سيتم استبداله بشعار نصي احترافي أو يمكنك وضع صورة في مجلد public لاحقاً
+
+// --- الأنواع (Interfaces) ---
 export interface Transaction {
   id: string;
   type: 'sent' | 'received';
@@ -20,13 +26,13 @@ export type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
 export interface WalletData {
   address: string;
   balance: number;
-  accountAge: number; // in days
+  accountAge: number; // بالقيم اليومية
   transactions: Transaction[];
   totalTransactions: number;
-  reputaScore: number; // 0-1000
+  reputaScore: number; // من 0 إلى 1000
   trustLevel: TrustLevel;
-  consistencyScore: number; // 0-100
-  networkTrust: number; // 0-100
+  consistencyScore: number;
+  networkTrust: number;
   riskLevel: 'Low' | 'Medium' | 'High';
 }
 
@@ -36,7 +42,6 @@ export default function App() {
   const [hasProAccess, setHasProAccess] = useState(false);
 
   const handleWalletCheck = (address: string) => {
-    // Mock data generation based on wallet address
     const mockData = generateMockWalletData(address);
     setWalletData(mockData);
   };
@@ -50,7 +55,6 @@ export default function App() {
   };
 
   const handleAccessUpgrade = () => {
-    // In real app, this would integrate with Pi SDK
     setHasProAccess(true);
     setIsUpgradeModalOpen(false);
   };
@@ -62,24 +66,21 @@ export default function App() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center">
-                <img 
-                  src={logoImage} 
-                  alt="Reputa Analytics" 
-                  className="w-full h-full object-contain"
-                  style={{ mixBlendMode: 'multiply' }}
-                />
+              {/* استبدال صورة Figma المكسورة بشعار CSS احترافي */}
+              <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 to-blue-500 rounded-xl flex items-center justify-center shadow-lg transform rotate-3">
+                <span className="text-white font-black text-xl">R</span>
               </div>
               <div>
-                <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-600 to-blue-700 bg-clip-text text-transparent leading-tight">
                   Reputa Score
                 </h1>
-                <p className="text-xs text-gray-500">v2.5 • Pi Network</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">v2.5 • Pi Network</p>
               </div>
             </div>
+            
             {hasProAccess && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full shadow-lg">
-                <span className="text-sm font-semibold text-white">Pro Member</span>
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full shadow-md animate-pulse">
+                <span className="text-[10px] font-black text-white uppercase">Pro Member</span>
               </div>
             )}
           </div>
@@ -87,9 +88,11 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-12">
         {!walletData ? (
-          <WalletChecker onCheck={handleWalletCheck} />
+          <div className="max-w-2xl mx-auto">
+            <WalletChecker onCheck={handleWalletCheck} />
+          </div>
         ) : (
           <WalletAnalysis
             walletData={walletData}
@@ -101,10 +104,10 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
-        <div className="container mx-auto px-4 py-6">
-          <p className="text-center text-sm text-gray-500">
-            © 2024 Reputa Analytics. Powered by Pi Network Blockchain.
+      <footer className="border-t bg-white/50 backdrop-blur-sm mt-20 py-8">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-xs text-gray-400 font-medium tracking-wide">
+            © 2025 Reputa Analytics. Powered by Pi Network Blockchain.
           </p>
         </div>
       </footer>
@@ -119,9 +122,9 @@ export default function App() {
   );
 }
 
-// Helper function to generate mock wallet data
+// --- Helper Functions (Logic) ---
+
 function generateMockWalletData(address: string): WalletData {
-  // Generate deterministic data based on address
   const seed = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const random = (min: number, max: number) => {
     const x = Math.sin(seed) * 10000;
@@ -129,10 +132,9 @@ function generateMockWalletData(address: string): WalletData {
   };
 
   const balance = random(100, 10000) + random(0, 99) / 100;
-  const accountAge = random(30, 730); // 30 days to 2 years
+  const accountAge = random(30, 730);
   const totalTransactions = random(10, 500);
 
-  // Generate last 10 non-zero transactions
   const transactions: Transaction[] = Array.from({ length: 10 }, (_, i) => {
     const isReceived = random(0, 1) === 1;
     const amount = random(1, 100) + random(0, 99) / 100;
@@ -149,39 +151,13 @@ function generateMockWalletData(address: string): WalletData {
     };
   });
 
-  // Calculate trust score based on factors
   const balanceScore = Math.min((balance / 1000) * 30, 30);
   const ageScore = Math.min((accountAge / 365) * 40, 40);
   const activityScore = Math.min((totalTransactions / 100) * 30, 30);
   const trustScore = Math.round(balanceScore + ageScore + activityScore);
 
-  // Determine trust level
-  let trustLevel: TrustLevel;
-  if (trustScore >= 90) {
-    trustLevel = 'Elite';
-  } else if (trustScore >= 70) {
-    trustLevel = 'High';
-  } else if (trustScore >= 50) {
-    trustLevel = 'Medium';
-  } else {
-    trustLevel = 'Low';
-  }
-
-  // Calculate consistency score
-  const consistencyScore = random(0, 100);
-
-  // Calculate network trust
-  const networkTrust = random(0, 100);
-
-  // Determine risk level
-  let riskLevel: 'Low' | 'Medium' | 'High';
-  if (networkTrust < 30) {
-    riskLevel = 'High';
-  } else if (networkTrust < 60) {
-    riskLevel = 'Medium';
-  } else {
-    riskLevel = 'Low';
-  }
+  const trustLevel: TrustLevel = trustScore >= 90 ? 'Elite' : trustScore >= 70 ? 'High' : trustScore >= 50 ? 'Medium' : 'Low';
+  const networkTrust = random(20, 100);
 
   return {
     address,
@@ -191,9 +167,9 @@ function generateMockWalletData(address: string): WalletData {
     totalTransactions,
     reputaScore: trustScore * 10,
     trustLevel,
-    consistencyScore,
+    consistencyScore: random(30, 95),
     networkTrust,
-    riskLevel,
+    riskLevel: networkTrust < 30 ? 'High' : networkTrust < 60 ? 'Medium' : 'Low',
   };
 }
 
