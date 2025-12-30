@@ -3,7 +3,7 @@ import { Search, Shield, Info, Lock, Sparkles } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
-import logoImage from 'figma:asset/71d6ce0d5126ce979679bfeb7773717fbd2e59af.png';
+
 
 interface WalletCheckerProps {
   onCheck: (address: string) => void;
