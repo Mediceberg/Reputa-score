@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from 'react';
-import { WalletChecker } from './components/WalletChecker';
-import { WalletAnalysis } from './components/WalletAnalysis';
-import { AccessUpgradeModal } from './components/AccessUpgradeModal';
+// استخدام @/components يضمن لـ Vercel الوصول للمجلد الصحيح
+import { WalletChecker } from '@/components/WalletChecker';
+import { WalletAnalysis } from '@/components/WalletAnalysis';
+import { AccessUpgradeModal } from '@/components/AccessUpgradeModal';
 
 // --- Types & Interfaces ---
 export interface Transaction {
