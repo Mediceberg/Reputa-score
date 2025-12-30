@@ -1,16 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // تعطيل المحرك الذي يسبب لك الأخطاء حالياً
-  experimental: {
-    turbo: false
-  },
-  // تجاهل أخطاء التنسيق والأنواع لضمان نجاح الـ Build
+  // تعطيل فحص الأخطاء أثناء البناء لضمان استمرار العملية
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
+  // إيقاف ميزات التجريبية التي قد تسبب تعارض مع Vercel
+  experimental: {
+    // نتركها فارغة لتجنب أي إعداد خاطئ
+  },
+  // تحسين معالجة الصور
+  images: {
+    unoptimized: true,
+  }
 };
 
 export default nextConfig;
