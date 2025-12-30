@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion'; // استبدل motion/react بـ framer-motion
+import { motion } from 'framer-motion'; // إصلاح الخطأ الأول
 import { ShieldCheck, ShieldAlert, ShieldBan, Sparkles } from 'lucide-react';
 import { Card } from './ui/card';
 
-// أضف هذا السطر واحذف السطر الذي يحتوي على '../App'
+// إصلاح الخطأ الثاني: تعريف النوع محلياً بدلاً من استيراده من ملف غير موجود
 type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
 
 interface TrustGaugeProps {
-  score: number; // 0-1000
+  score: number;
   trustLevel: TrustLevel;
   consistencyScore?: number;
   networkTrust?: number;
 }
 
-export function TrustGauge({ score, trustLevel, consistencyScore, networkTrust }: TrustGaugeProps) {
+export function TrustGauge({ score, trustLevel }: TrustGaugeProps) {
   const [animatedScore, setAnimatedScore] = useState(0);
   const [displayScore, setDisplayScore] = useState(0);
 
@@ -53,33 +53,16 @@ export function TrustGauge({ score, trustLevel, consistencyScore, networkTrust }
     }
   };
 
-  const getIcon = () => {
-    if (trustLevel === 'Elite' || trustLevel === 'High') return <ShieldCheck className="w-8 h-8" />;
-    if (trustLevel === 'Medium') return <ShieldAlert className="w-8 h-8" />;
-    return <ShieldBan className="w-8 h-8" />;
-  };
-
-  const getDescription = () => {
-    switch (trustLevel) {
-      case 'Elite': return 'Exceptional reputation. Elite-level trustworthiness.';
-      case 'High': return 'Strong reputation with consistent positive signals.';
-      case 'Medium': return 'Moderate trust signals. Standard verification recommended.';
-      case 'Low': return 'Limited trust indicators. Enhanced due diligence advised.';
-      default: return '';
-    }
-  };
-
   const gaugeColor = getGaugeColor(trustLevel);
-  const normalizedScore = score / 10;
-  const rotation = (normalizedScore / 100) * 180 - 90;
+  const rotation = ((score / 10) / 100) * 180 - 90;
 
   return (
-    <Card className="p-6 bg-zinc-900/50 border-white/5 text-white rounded-[35px]">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="font-bold text-xl">Trust Intelligence</h2>
+    <Card className="p-6 bg-zinc-900/80 border-white/5 text-white rounded-[35px] shadow-2xl backdrop-blur-md">
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="font-bold text-xl tracking-tight">Trust Intelligence</h2>
         <div className="flex items-center gap-2 px-3 py-1 bg-purple-500/10 rounded-full border border-purple-500/20">
           <Sparkles className="w-3 h-3 text-purple-400" />
-          <span className="text-[10px] font-bold text-purple-400 uppercase">AI Analysis</span>
+          <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Reputa AI</span>
         </div>
       </div>
       
@@ -93,7 +76,7 @@ export function TrustGauge({ score, trustLevel, consistencyScore, networkTrust }
                 <stop offset="100%" stopColor="#10b981" />
               </linearGradient>
             </defs>
-            <path d="M 20 80 A 80 80 0 0 1 180 80" fill="none" stroke="#333" strokeWidth="12" strokeLinecap="round" />
+            <path d="M 20 80 A 80 80 0 0 1 180 80" fill="none" stroke="#27272a" strokeWidth="12" strokeLinecap="round" />
             <motion.path
               d="M 20 80 A 80 80 0 0 1 180 80"
               fill="none"
@@ -102,21 +85,28 @@ export function TrustGauge({ score, trustLevel, consistencyScore, networkTrust }
               strokeLinecap="round"
               initial={{ pathLength: 0 }}
               animate={{ pathLength: animatedScore / 1000 }}
-              transition={{ duration: 1, ease: 'easeOut' }}
+              transition={{ duration: 1.5, ease: 'easeOut' }}
             />
           </svg>
-          <div className="absolute inset-x-0 bottom-0 text-center">
-             <span className="font-black text-4xl" style={{ color: gaugeColor }}>{displayScore}</span>
-             <p className="text-[10px] text-zinc-500 uppercase font-bold">Trust Score</p>
+          <div className="absolute inset-x-0 bottom-0 text-center translate-y-2">
+             <span className="font-black text-5xl tracking-tighter" style={{ color: gaugeColor }}>{displayScore}</span>
+             <p className="text-[10px] text-zinc-500 uppercase font-black tracking-[0.2em] mt-1">Trust Score</p>
           </div>
         </div>
 
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-xl" style={{ backgroundColor: `${gaugeColor}20`, color: gaugeColor }}>{getIcon()}</div>
-            <h3 className="font-black text-lg uppercase tracking-tight">{trustLevel} Status</h3>
+        <div className="flex-1 space-y-4">
+          <div className="flex items-center gap-3">
+             <div className="p-3 rounded-2xl bg-white/5 border border-white/10" style={{ color: gaugeColor }}>
+                {trustLevel === 'Elite' || trustLevel === 'High' ? <ShieldCheck /> : <ShieldAlert />}
+             </div>
+             <div>
+                <h3 className="font-black text-lg uppercase tracking-tight leading-none">{trustLevel} Wallet</h3>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase mt-1">Status Verified</p>
+             </div>
           </div>
-          <p className="text-zinc-400 text-xs leading-relaxed">{getDescription()}</p>
+          <p className="text-zinc-400 text-xs leading-relaxed italic">
+             Our AI has analyzed this wallet behavior across the Pi Network. Current signals indicate a <b>{trustLevel.toLowerCase()}</b> reliability factor.
+          </p>
         </div>
       </div>
     </Card>
