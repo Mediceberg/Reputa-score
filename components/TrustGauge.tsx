@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion'; // تأكد أنها framer-motion وليس motion/react
+import { motion } from 'framer-motion'; // استبدل motion/react بـ framer-motion
 import { ShieldCheck, ShieldAlert, ShieldBan, Sparkles } from 'lucide-react';
 import { Card } from './ui/card';
 
-// تعريف النوع هنا مباشرة لتجنب خطأ الاستيراد من App
-export type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
+// أضف هذا السطر واحذف السطر الذي يحتوي على '../App'
+type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
 
 interface TrustGaugeProps {
   score: number; // 0-1000
