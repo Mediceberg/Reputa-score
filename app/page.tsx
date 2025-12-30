@@ -7,8 +7,6 @@ import { WalletChecker } from '@/components/WalletChecker';
 import { WalletAnalysis } from '@/components/WalletAnalysis';
 import { AccessUpgradeModal } from '@/components/AccessUpgradeModal';
 
-// ملاحظة: تم حذف استيراد logoImage من Figma لأنه يسبب فشل البناء (Build Error)
-// سيتم استبداله بشعار نصي احترافي أو يمكنك وضع صورة في مجلد public لاحقاً
 
 // --- الأنواع (Interfaces) ---
 export interface Transaction {
