@@ -1,93 +1,73 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-// استخدام @ هو الأضمن للمسارات في Next.js
-import { WalletChecker } from '@/components/WalletChecker';
-import { WalletAnalysis } from '@/components/WalletAnalysis';
-import { AccessUpgradeModal } from '@/components/AccessUpgradeModal';
 
 export default function App() {
+  const [address, setAddress] = useState('');
   const [walletData, setWalletData] = useState<any>(null);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [hasProAccess, setHasProAccess] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // لضمان توافق الواجهة مع السيرفر (Hydration)
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => setMounted(true), []);
 
-  const handleWalletCheck = (address: string) => {
-    // المحرك الخاص بك لتوليد البيانات (v2.5)
-    const seed = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const random = (min: number, max: number) => {
-      const x = Math.sin(seed) * 10000;
-      return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
-    };
-
-    const scoreRaw = Math.round(random(30, 95));
-    
+  const checkWallet = () => {
+    if(!address) return;
     setWalletData({
-      address,
-      balance: random(100, 10000),
-      accountAge: random(30, 730),
-      transactions: [], 
-      totalTransactions: random(10, 500),
-      reputaScore: scoreRaw * 10,
-      trustLevel: scoreRaw >= 90 ? 'Elite' : scoreRaw >= 70 ? 'High' : scoreRaw >= 50 ? 'Medium' : 'Low',
-      consistencyScore: random(40, 98),
-      networkTrust: random(30, 95),
-      riskLevel: scoreRaw > 60 ? 'Low' : 'Medium',
+      address: address,
+      reputaScore: Math.floor(Math.random() * 300) + 600,
+      trustLevel: 'High',
+      balance: (Math.random() * 1000).toFixed(2)
     });
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-yellow-50">
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-lg">
-              R
-            </div>
-            <div>
-              <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-600 to-blue-700 bg-clip-text text-transparent">
-                Reputa Score
-              </h1>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">v2.5 • Pi Network</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4">
+      <div className="max-w-md mx-auto bg-white shadow-2xl rounded-3xl overflow-hidden mt-10 border border-slate-100">
+        <div className="bg-purple-600 p-6 text-white text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-black">R</div>
+          <h1 className="text-xl font-bold">Reputa Score v2.5</h1>
         </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-12">
-        {!walletData ? (
-          <WalletChecker onCheck={handleWalletCheck} />
-        ) : (
-          <WalletAnalysis
-            walletData={walletData}
-            isProUser={hasProAccess}
-            onReset={() => setWalletData(null)}
-            onUpgradePrompt={() => setIsUpgradeModalOpen(true)}
-          />
-        )}
-      </main>
-
-      <footer className="border-t bg-white/50 py-8 mt-auto text-center">
-        <p className="text-xs text-gray-400 font-semibold uppercase tracking-widest">
-          © 2025 Reputa Analytics • Powered by Pi Network
-        </p>
-      </footer>
-
-      <AccessUpgradeModal
-        isOpen={isUpgradeModalOpen}
-        onClose={() => setIsUpgradeModalOpen(false)}
-        onUpgrade={() => {
-          setHasProAccess(true);
-          setIsUpgradeModalOpen(false);
-        }}
-      />
+        <div className="p-8">
+          {!walletData ? (
+            <div className="space-y-4">
+              <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Wallet Address</label>
+              <input 
+                type="text" 
+                placeholder="G..." 
+                className="w-full p-4 bg-slate-100 rounded-xl border-2 border-transparent focus:border-purple-500 outline-none transition-all"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+              <button 
+                onClick={checkWallet}
+                className="w-full bg-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-purple-700 transition-all"
+              >
+                Check Reputation
+              </button>
+            </div>
+          ) : (
+            <div className="text-center space-y-6 animate-in fade-in zoom-in duration-500">
+              <div className="relative inline-block">
+                <svg className="w-32 h-32 transform -rotate-90">
+                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
+                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-purple-600" strokeDasharray="364.4" strokeDashoffset={364.4 - (364.4 * walletData.reputaScore / 1000)} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black">{walletData.reputaScore}</span>
+                  <span className="text-[10px] text-slate-400 font-bold">SCORE</span>
+                </div>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Trust Level: <span className="text-green-500">{walletData.trustLevel}</span></h2>
+                <p className="text-sm text-slate-500">Address: {walletData.address.substring(0,6)}...{walletData.address.substring(50)}</p>
+              </div>
+              <button onClick={() => setWalletData(null)} className="text-purple-600 font-bold text-sm">New Check</button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
