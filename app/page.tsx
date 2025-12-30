@@ -1,201 +1,120 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useState } from 'react';
+import { WalletChecker } from './components/WalletChecker';
+import { WalletAnalysis } from './components/WalletAnalysis';
+import { AccessUpgradeModal } from './components/AccessUpgradeModal';
 
-/** * تعديل المسارات هنا:
- * بما أننا في app/page.tsx، نخرج خطوة للخلف للوصول إلى مجلد components 
- * الذي يحتوي على الملفات التي رفعتها.
- */
-import { EntryPage } from "../components/entry-page"
-import { Dashboard } from "../components/dashboard"
+// Mock wallet data for demonstration
+export interface Transaction {
+  id: string;
+  type: 'sent' | 'received';
+  amount: number;
+  from: string;
+  to: string;
+  timestamp: Date;
+  memo?: string;
+}
 
-// تعريف الأنواع لضمان عدم حدوث أخطاء
 export type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
 
 export interface WalletData {
   address: string;
   balance: number;
   accountAge: number;
+  transactions: Transaction[];
+  totalTransactions: number;
   reputaScore: number;
   trustLevel: TrustLevel;
+  consistencyScore: number;
+  networkTrust: number;
   riskLevel: 'Low' | 'Medium' | 'High';
 }
 
-const notificationIcons = {
-  success: "✅",
-  error: "❌",
-  loading: "⏳",
-  info: "ℹ️"
-};
+export default function App() {
+  const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [hasProAccess, setHasProAccess] = useState(false);
 
-export default function HomePage() {
-  const [walletAddress, setWalletAddress] = useState<string>("")
-  const [username, setUsername] = useState<string>("") 
-  const [isConnected, setIsConnected] = useState(false)
-  const [blockchainData, setBlockchainData] = useState<WalletData | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [lang, setLang] = useState('en')
-  const [notification, setNotification] = useState<string | null>(null)
-  const [notifType, setNotifType] = useState<keyof typeof notificationIcons>("info")
+  const handleWalletCheck = (address: string) => {
+    const mockData = generateMockWalletData(address);
+    setWalletData(mockData);
+  };
 
-  const showToast = useCallback((msg: string, type: keyof typeof notificationIcons) => {
-    setNotifType(type);
-    setNotification(msg);
-    if (type !== "loading") setTimeout(() => setNotification(null), 4000);
-  }, []);
+  const handleReset = () => {
+    setWalletData(null);
+  };
 
-  // --- 1. نظام المصادقة (Pi Auth) ---
-  useEffect(() => {
-    const loginToPi = async () => {
-      if (typeof window !== "undefined" && (window as any).Pi) {
-        try {
-          const Pi = (window as any).Pi;
-          const auth = await Pi.authenticate(['username', 'payments'], (payment: any) => {
-            console.log("Payment in progress:", payment);
-          });
-          
-          if (auth && auth.user) {
-            setUsername(auth.user.username);
-            showToast(lang === 'ar' ? `مرحباً ${auth.user.username}` : `Welcome ${auth.user.username}`, "success");
-          }
-        } catch (error: any) {
-          console.error("Auth failed:", error);
-        }
-      }
-    };
-    const timer = setTimeout(loginToPi, 1000);
-    return () => clearTimeout(timer);
-  }, [lang, showToast]);
+  const handleUpgradePrompt = () => {
+    setIsUpgradeModalOpen(true);
+  };
 
-  // --- 2. منطق فحص المحفظة ---
-  const handleConnect = async (address: string) => {
-    setIsLoading(true);
-    showToast(lang === 'ar' ? "جاري تحليل بيانات البلوكشين..." : "Analyzing blockchain data...", "loading");
-    
-    try {
-      const response = await fetch('/api/wallet/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: address }),
-      });
-
-      const data = await response.json();
-
-      if (data.isValid) {
-        setBlockchainData(data);
-      } else {
-        const mockData = generateMockWalletData(address);
-        setBlockchainData(mockData);
-      }
-      
-      setWalletAddress(address);
-      setIsConnected(true);
-      setNotification(null);
-    } catch (error) {
-      const mockData = generateMockWalletData(address);
-      setBlockchainData(mockData);
-      setWalletAddress(address);
-      setIsConnected(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // --- 3. منطق الدفع ---
-  const handlePayment = async () => {
-    if (!(window as any).Pi) {
-      showToast("Pi SDK not detected!", "error");
-      return;
-    }
-
-    try {
-      showToast(lang === 'ar' ? "انتظار تأكيد الشبكة..." : "Awaiting network...", "loading");
-      
-      await (window as any).Pi.createPayment({
-        amount: 1,
-        memo: `Upgrade to Pro - Reputa Score`,
-        metadata: { wallet: walletAddress, user: username },
-      }, {
-        onReadyForServerApproval: async (paymentId: string) => {
-          return await fetch('/api/pi/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId }),
-          }).then(res => res.json());
-        },
-        onReadyForServerCompletion: async (paymentId: string, txid: string) => {
-          const res = await fetch('/api/pi/complete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ paymentId, txid }),
-          });
-          if (res.ok) {
-            showToast(lang === 'ar' ? "تم التفعيل!" : "Activated!", "success");
-            return res.json();
-          }
-        },
-        onCancel: () => showToast("Cancelled", "info"),
-        onError: (error: Error) => showToast("Payment Failed", "error"),
-      });
-    } catch (err: any) {
-      console.error(err);
-    }
-  }
+  const handleAccessUpgrade = () => {
+    setHasProAccess(true);
+    setIsUpgradeModalOpen(false);
+  };
 
   return (
-    <div className={`min-h-screen bg-background relative ${lang === 'ar' ? 'font-arabic text-right' : ''}`}>
-      <AnimatePresence>
-        {notification && (
-          <motion.div 
-            initial={{ y: 50, opacity: 0, x: "-50%" }} 
-            animate={{ y: 0, opacity: 1, x: "-50%" }} 
-            exit={{ y: 50, opacity: 0, x: "-50%" }}
-            className={`fixed bottom-10 left-1/2 z-[100] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border ${
-              notifType === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' :
-              notifType === 'error' ? 'bg-red-500/20 border-red-500/50 text-red-400' :
-              'bg-purple-500/20 border-purple-500/50 text-purple-400'
-            }`}
-          >
-            <span className="text-xl">{notificationIcons[notifType]}</span>
-            <p className="font-bold text-sm">{notification}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-yellow-50">
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 flex items-center justify-center bg-purple-600 rounded-lg text-white font-bold">
+                {/* استبدال مؤقت لشعار فيجما لضمان عدم تعطل البناء */}
+                R
+              </div>
+              <div>
+                <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                  Reputa Score
+                </h1>
+                <p className="text-xs text-gray-500">v2.5 • Pi Network</p>
+              </div>
+            </div>
+            {hasProAccess && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full shadow-lg">
+                <span className="text-sm font-semibold text-white">Pro Member</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
 
-      <div className="fixed top-4 right-4 z-50 flex gap-2">
-        {['en', 'ar'].map((l) => (
-          <button 
-            key={l} 
-            onClick={() => setLang(l)} 
-            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === l ? 'bg-purple-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400'}`}
-          >
-            {l.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
-      <AnimatePresence mode="wait">
-        {!isConnected ? (
-          <motion.div key="entry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <EntryPage onConnect={handleConnect} />
-          </motion.div>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {!walletData ? (
+          <WalletChecker onCheck={handleWalletCheck} />
         ) : (
-          <motion.div key="dashboard" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Dashboard 
-              walletAddress={walletAddress} 
-              username={username} 
-              data={blockchainData} 
-              onDisconnect={() => setIsConnected(false)}
-              onStartPayment={handlePayment} 
-            />
-          </motion.div>
+          <WalletAnalysis
+            walletData={walletData}
+            isProUser={hasProAccess}
+            onReset={handleReset}
+            onUpgradePrompt={handleUpgradePrompt}
+          />
         )}
-      </AnimatePresence>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
+        <div className="container mx-auto px-4 py-6">
+          <p className="text-center text-sm text-gray-500">
+            © 2024 Reputa Analytics. Powered by Pi Network Blockchain.
+          </p>
+        </div>
+      </footer>
+
+      {/* Upgrade Modal */}
+      <AccessUpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onUpgrade={handleAccessUpgrade}
+      />
     </div>
-  )
+  );
 }
 
+// Helper functions (المنطق الخاص بك كما هو)
 function generateMockWalletData(address: string): WalletData {
   const seed = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const random = (min: number, max: number) => {
@@ -203,13 +122,40 @@ function generateMockWalletData(address: string): WalletData {
     return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
   };
 
-  const trustScore = random(40, 95);
+  const balance = random(100, 10000) + random(0, 99) / 100;
+  const accountAge = random(30, 730);
+  const totalTransactions = random(10, 500);
+
+  const transactions: Transaction[] = Array.from({ length: 10 }, (_, i) => {
+    const isReceived = random(0, 1) === 1;
+    return {
+      id: `tx_${seed}_${i}`,
+      type: isReceived ? 'received' : 'sent',
+      amount: random(1, 100) + random(0, 99) / 100,
+      from: isReceived ? generateRandomAddress(seed + i) : address,
+      to: isReceived ? address : generateRandomAddress(seed + i + 1),
+      timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+      memo: i % 3 === 0 ? 'Payment' : undefined,
+    };
+  });
+
+  const trustScore = Math.round(Math.min((balance / 1000) * 30, 30) + Math.min((accountAge / 365) * 40, 40) + Math.min((totalTransactions / 100) * 30, 30));
+
   return {
-    address,
-    balance: random(50, 5000),
-    accountAge: random(10, 500),
+    address, balance, accountAge, transactions, totalTransactions,
     reputaScore: trustScore * 10,
-    trustLevel: trustScore > 85 ? 'Elite' : trustScore > 70 ? 'High' : 'Medium',
-    riskLevel: trustScore > 60 ? 'Low' : 'Medium'
+    trustLevel: trustScore >= 90 ? 'Elite' : trustScore >= 70 ? 'High' : trustScore >= 50 ? 'Medium' : 'Low',
+    consistencyScore: random(0, 100),
+    networkTrust: random(0, 100),
+    riskLevel: random(0, 100) < 30 ? 'High' : random(0, 100) < 60 ? 'Medium' : 'Low',
   };
+}
+
+function generateRandomAddress(seed: number): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let address = 'G';
+  for (let i = 0; i < 55; i++) {
+    address += chars[Math.floor(Math.abs(Math.sin(seed + i) * 10000) % chars.length)];
+  }
+  return address;
 }
