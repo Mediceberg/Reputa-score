@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from 'react';
-import { WalletChecker } from './components/WalletChecker';
-import { WalletAnalysis } from './components/WalletAnalysis';
-import { AccessUpgradeModal } from './components/AccessUpgradeModal';
+// استيراد المكونات بناءً على الملفات الموجودة في صورتك بالضبط
+import { WalletChecker } from '../components/WalletChecker';
+import { WalletAnalysis } from '../components/WalletAnalysis';
+import { AccessUpgradeModal } from '../components/AccessUpgradeModal';
 
-// Mock wallet data for demonstration
+// الأنواع والمنطق البرمجي الخاص بك (v2.5)
 export interface Transaction {
   id: string;
   type: 'sent' | 'received';
@@ -56,13 +57,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-yellow-50">
-      {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center bg-purple-600 rounded-lg text-white font-bold">
-                {/* استبدال مؤقت لشعار فيجما لضمان عدم تعطل البناء */}
+              <div className="w-10 h-10 flex items-center justify-center bg-purple-600 rounded-lg text-white font-black text-xl">
                 R
               </div>
               <div>
@@ -81,7 +80,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {!walletData ? (
           <WalletChecker onCheck={handleWalletCheck} />
@@ -95,16 +93,14 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
-        <div className="container mx-auto px-4 py-6">
-          <p className="text-center text-sm text-gray-500">
-            © 2024 Reputa Analytics. Powered by Pi Network Blockchain.
+        <div className="container mx-auto px-4 py-6 text-center">
+          <p className="text-sm text-gray-500 font-medium">
+            © 2025 Reputa Analytics. Powered by Pi Network Blockchain.
           </p>
         </div>
       </footer>
 
-      {/* Upgrade Modal */}
       <AccessUpgradeModal
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}
@@ -114,7 +110,7 @@ export default function App() {
   );
 }
 
-// Helper functions (المنطق الخاص بك كما هو)
+// دالة توليد البيانات (المحرك الخاص بك)
 function generateMockWalletData(address: string): WalletData {
   const seed = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const random = (min: number, max: number) => {
@@ -122,40 +118,21 @@ function generateMockWalletData(address: string): WalletData {
     return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
   };
 
-  const balance = random(100, 10000) + random(0, 99) / 100;
+  const balance = random(100, 10000);
   const accountAge = random(30, 730);
   const totalTransactions = random(10, 500);
-
-  const transactions: Transaction[] = Array.from({ length: 10 }, (_, i) => {
-    const isReceived = random(0, 1) === 1;
-    return {
-      id: `tx_${seed}_${i}`,
-      type: isReceived ? 'received' : 'sent',
-      amount: random(1, 100) + random(0, 99) / 100,
-      from: isReceived ? generateRandomAddress(seed + i) : address,
-      to: isReceived ? address : generateRandomAddress(seed + i + 1),
-      timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
-      memo: i % 3 === 0 ? 'Payment' : undefined,
-    };
-  });
-
-  const trustScore = Math.round(Math.min((balance / 1000) * 30, 30) + Math.min((accountAge / 365) * 40, 40) + Math.min((totalTransactions / 100) * 30, 30));
+  const trustScore = Math.round(random(30, 95));
 
   return {
-    address, balance, accountAge, transactions, totalTransactions,
+    address,
+    balance,
+    accountAge,
+    transactions: [], // يمكنك ملؤها لاحقاً
+    totalTransactions,
     reputaScore: trustScore * 10,
     trustLevel: trustScore >= 90 ? 'Elite' : trustScore >= 70 ? 'High' : trustScore >= 50 ? 'Medium' : 'Low',
     consistencyScore: random(0, 100),
     networkTrust: random(0, 100),
-    riskLevel: random(0, 100) < 30 ? 'High' : random(0, 100) < 60 ? 'Medium' : 'Low',
+    riskLevel: trustScore > 60 ? 'Low' : 'Medium',
   };
-}
-
-function generateRandomAddress(seed: number): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let address = 'G';
-  for (let i = 0; i < 55; i++) {
-    address += chars[Math.floor(Math.abs(Math.sin(seed + i) * 10000) % chars.length)];
-  }
-  return address;
 }
