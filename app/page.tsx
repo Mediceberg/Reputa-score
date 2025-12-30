@@ -1,73 +1,161 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { WalletChecker } from './components/WalletChecker';
+import { WalletAnalysis } from './components/WalletAnalysis';
+import { AccessUpgradeModal } from './components/AccessUpgradeModal';
+
+// --- Types & Interfaces ---
+export interface Transaction {
+  id: string;
+  type: 'sent' | 'received';
+  amount: number;
+  from: string;
+  to: string;
+  timestamp: Date;
+  memo?: string;
+}
+
+export type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
+
+export interface WalletData {
+  address: string;
+  balance: number;
+  accountAge: number; 
+  transactions: Transaction[];
+  totalTransactions: number;
+  reputaScore: number; 
+  trustLevel: TrustLevel;
+  consistencyScore: number;
+  networkTrust: number;
+  riskLevel: 'Low' | 'Medium' | 'High';
+}
 
 export default function App() {
-  const [address, setAddress] = useState('');
-  const [walletData, setWalletData] = useState<any>(null);
-  const [mounted, setMounted] = useState(false);
+  const [walletData, setWalletData] = useState<WalletData | null>(null);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [hasProAccess, setHasProAccess] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
-  const checkWallet = () => {
-    if(!address) return;
-    setWalletData({
-      address: address,
-      reputaScore: Math.floor(Math.random() * 300) + 600,
-      trustLevel: 'High',
-      balance: (Math.random() * 1000).toFixed(2)
-    });
+  const handleWalletCheck = (address: string) => {
+    const mockData = generateMockWalletData(address);
+    setWalletData(mockData);
   };
 
-  if (!mounted) return null;
+  const handleReset = () => {
+    setWalletData(null);
+  };
+
+  const handleUpgradePrompt = () => {
+    setIsUpgradeModalOpen(true);
+  };
+
+  const handleAccessUpgrade = () => {
+    setHasProAccess(true);
+    setIsUpgradeModalOpen(false);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4">
-      <div className="max-w-md mx-auto bg-white shadow-2xl rounded-3xl overflow-hidden mt-10 border border-slate-100">
-        <div className="bg-purple-600 p-6 text-white text-center">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-black">R</div>
-          <h1 className="text-xl font-bold">Reputa Score v2.5</h1>
-        </div>
-
-        <div className="p-8">
-          {!walletData ? (
-            <div className="space-y-4">
-              <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Wallet Address</label>
-              <input 
-                type="text" 
-                placeholder="G..." 
-                className="w-full p-4 bg-slate-100 rounded-xl border-2 border-transparent focus:border-purple-500 outline-none transition-all"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-              <button 
-                onClick={checkWallet}
-                className="w-full bg-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-purple-700 transition-all"
-              >
-                Check Reputation
-              </button>
-            </div>
-          ) : (
-            <div className="text-center space-y-6 animate-in fade-in zoom-in duration-500">
-              <div className="relative inline-block">
-                <svg className="w-32 h-32 transform -rotate-90">
-                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100" />
-                  <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-purple-600" strokeDasharray="364.4" strokeDashoffset={364.4 - (364.4 * walletData.reputaScore / 1000)} />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-black">{walletData.reputaScore}</span>
-                  <span className="text-[10px] text-slate-400 font-bold">SCORE</span>
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-yellow-50">
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* استبدال الصورة بشعار CSS احترافي لتجنب خطأ Figma */}
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
+                <span className="text-white font-black text-xl">R</span>
               </div>
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Trust Level: <span className="text-green-500">{walletData.trustLevel}</span></h2>
-                <p className="text-sm text-slate-500">Address: {walletData.address.substring(0,6)}...{walletData.address.substring(50)}</p>
+                <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                  Reputa Score
+                </h1>
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">v2.5 • Pi Network</p>
               </div>
-              <button onClick={() => setWalletData(null)} className="text-purple-600 font-bold text-sm">New Check</button>
             </div>
-          )}
+            {hasProAccess && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full shadow-lg animate-bounce">
+                <span className="text-xs font-bold text-white uppercase tracking-tighter">Pro Member</span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {!walletData ? (
+          <WalletChecker onCheck={handleWalletCheck} />
+        ) : (
+          <WalletAnalysis
+            walletData={walletData}
+            isProUser={hasProAccess}
+            onReset={handleReset}
+            onUpgradePrompt={handleUpgradePrompt}
+          />
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
+        <div className="container mx-auto px-4 py-6">
+          <p className="text-center text-sm text-gray-500 font-medium">
+            © 2025 Reputa Analytics. Powered by Pi Network Blockchain.
+          </p>
+        </div>
+      </footer>
+
+      {/* Upgrade Modal */}
+      <AccessUpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onUpgrade={handleAccessUpgrade}
+      />
     </div>
   );
+}
+
+// --- Helper Functions ---
+function generateMockWalletData(address: string): WalletData {
+  const seed = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const random = (min: number, max: number) => {
+    const x = Math.sin(seed) * 10000;
+    return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
+  };
+
+  const balance = random(100, 10000) + random(0, 99) / 100;
+  const accountAge = random(30, 730);
+  const totalTransactions = random(10, 500);
+
+  const transactions: Transaction[] = Array.from({ length: 10 }, (_, i) => {
+    const isReceived = random(0, i + 1) % 2 === 0;
+    return {
+      id: `tx_${seed}_${i}`,
+      type: isReceived ? 'received' : 'sent',
+      amount: random(1, 100) + 0.5,
+      from: isReceived ? 'G_RANDOM_SENDER' : address,
+      to: isReceived ? address : 'G_RANDOM_RECEIVER',
+      timestamp: new Date(),
+      memo: i % 3 === 0 ? 'Pi Network' : undefined,
+    };
+  });
+
+  const trustScore = Math.min(Math.round((balance / 10000) * 100 + (accountAge / 730) * 100), 100);
+  
+  let trustLevel: TrustLevel = 'Medium';
+  if (trustScore > 85) trustLevel = 'Elite';
+  else if (trustScore > 65) trustLevel = 'High';
+  else if (trustScore < 30) trustLevel = 'Low';
+
+  return {
+    address,
+    balance,
+    accountAge,
+    transactions,
+    totalTransactions,
+    reputaScore: trustScore * 10,
+    trustLevel,
+    consistencyScore: random(40, 99),
+    networkTrust: random(30, 95),
+    riskLevel: trustScore > 50 ? 'Low' : 'Medium',
+  };
 }
