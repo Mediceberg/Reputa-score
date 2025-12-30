@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from 'react';
-// استيراد المكونات بناءً على الملفات الموجودة في صورتك بالضبط
-import { WalletChecker } from '../components/WalletChecker';
-import { WalletAnalysis } from '../components/WalletAnalysis';
-import { AccessUpgradeModal } from '../components/AccessUpgradeModal';
+import React, { useState } from 'react';
+// استخدام @ يحل مشكلة المسارات نهائياً في Next.js
+import { WalletChecker } from '@/components/WalletChecker';
+import { WalletAnalysis } from '@/components/WalletAnalysis';
+import { AccessUpgradeModal } from '@/components/AccessUpgradeModal';
 
-// الأنواع والمنطق البرمجي الخاص بك (v2.5)
+// تعريف الأنواع لضمان عدم وجود أخطاء TypeScript
+export type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
+
 export interface Transaction {
   id: string;
   type: 'sent' | 'received';
@@ -16,8 +18,6 @@ export interface Transaction {
   timestamp: Date;
   memo?: string;
 }
-
-export type TrustLevel = 'Low' | 'Medium' | 'High' | 'Elite';
 
 export interface WalletData {
   address: string;
@@ -38,18 +38,13 @@ export default function App() {
   const [hasProAccess, setHasProAccess] = useState(false);
 
   const handleWalletCheck = (address: string) => {
-    const mockData = generateMockWalletData(address);
-    setWalletData(mockData);
+    // المحرك الخاص بك لتوليد البيانات
+    const data = generateMockWalletData(address);
+    setWalletData(data);
   };
 
-  const handleReset = () => {
-    setWalletData(null);
-  };
-
-  const handleUpgradePrompt = () => {
-    setIsUpgradeModalOpen(true);
-  };
-
+  const handleReset = () => setWalletData(null);
+  const handleUpgradePrompt = () => setIsUpgradeModalOpen(true);
   const handleAccessUpgrade = () => {
     setHasProAccess(true);
     setIsUpgradeModalOpen(false);
@@ -57,32 +52,34 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-yellow-50">
+      {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 flex items-center justify-center bg-purple-600 rounded-lg text-white font-black text-xl">
-                R
-              </div>
-              <div>
-                <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-500 to-blue-600 bg-clip-text text-transparent">
-                  Reputa Score
-                </h1>
-                <p className="text-xs text-gray-500">v2.5 • Pi Network</p>
-              </div>
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center bg-purple-600 rounded-lg text-white font-black text-xl shadow-lg shadow-purple-200">
+              R
             </div>
-            {hasProAccess && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full shadow-lg">
-                <span className="text-sm font-semibold text-white">Pro Member</span>
-              </div>
-            )}
+            <div>
+              <h1 className="font-bold text-xl bg-gradient-to-r from-cyan-600 to-blue-700 bg-clip-text text-transparent leading-tight">
+                Reputa Score
+              </h1>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">v2.5 • Pi Network</p>
+            </div>
           </div>
+          {hasProAccess && (
+            <div className="px-4 py-1.5 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full shadow-md transform hover:scale-105 transition-transform cursor-default">
+              <span className="text-xs font-black text-white uppercase tracking-tighter">Pro Member</span>
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-12">
         {!walletData ? (
-          <WalletChecker onCheck={handleWalletCheck} />
+          <div className="max-w-xl mx-auto">
+             <WalletChecker onCheck={handleWalletCheck} />
+          </div>
         ) : (
           <WalletAnalysis
             walletData={walletData}
@@ -93,14 +90,16 @@ export default function App() {
         )}
       </main>
 
-      <footer className="border-t bg-white/50 backdrop-blur-sm mt-16">
-        <div className="container mx-auto px-4 py-6 text-center">
-          <p className="text-sm text-gray-500 font-medium">
-            © 2025 Reputa Analytics. Powered by Pi Network Blockchain.
+      {/* Footer */}
+      <footer className="border-t bg-white/50 backdrop-blur-sm py-8 mt-auto">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-xs text-gray-400 font-semibold tracking-widest uppercase">
+            © 2025 Reputa Analytics • Powered by Pi Network Blockchain
           </p>
         </div>
       </footer>
 
+      {/* Modal */}
       <AccessUpgradeModal
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}
@@ -110,7 +109,7 @@ export default function App() {
   );
 }
 
-// دالة توليد البيانات (المحرك الخاص بك)
+// دالة المحرك (Logic) - تم نقلها خارج المكون لضمان استقرار الأداء
 function generateMockWalletData(address: string): WalletData {
   const seed = address.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const random = (min: number, max: number) => {
@@ -121,18 +120,18 @@ function generateMockWalletData(address: string): WalletData {
   const balance = random(100, 10000);
   const accountAge = random(30, 730);
   const totalTransactions = random(10, 500);
-  const trustScore = Math.round(random(30, 95));
+  const scoreRaw = Math.round(random(30, 95));
 
   return {
     address,
     balance,
     accountAge,
-    transactions: [], // يمكنك ملؤها لاحقاً
+    transactions: [],
     totalTransactions,
-    reputaScore: trustScore * 10,
-    trustLevel: trustScore >= 90 ? 'Elite' : trustScore >= 70 ? 'High' : trustScore >= 50 ? 'Medium' : 'Low',
-    consistencyScore: random(0, 100),
-    networkTrust: random(0, 100),
-    riskLevel: trustScore > 60 ? 'Low' : 'Medium',
+    reputaScore: scoreRaw * 10,
+    trustLevel: scoreRaw >= 90 ? 'Elite' : scoreRaw >= 70 ? 'High' : scoreRaw >= 50 ? 'Medium' : 'Low',
+    consistencyScore: random(40, 98),
+    networkTrust: random(30, 95),
+    riskLevel: scoreRaw > 65 ? 'Low' : scoreRaw > 45 ? 'Medium' : 'High',
   };
 }
