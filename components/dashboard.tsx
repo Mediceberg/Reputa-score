@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
 // استيراد المكون الجديد بدلاً من TrustScoreGauge
-import { TrustGauge } from "./trust-gauge" 
+import { TrustGauge } from "./TrustGauge"
 import { LogOut, Search, Crown, Loader2, CreditCard, ArrowDownLeft, ArrowUpRight, History, ShieldCheck } from "lucide-react"
 
 interface DashboardProps {
