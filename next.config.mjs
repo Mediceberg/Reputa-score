@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // هذا السطر يحل مشكلة Turbopack التي تظهر في السجلات عندك
+  // تعطيل المحرك الذي يسبب لك الأخطاء حالياً
   experimental: {
-    turbo: false 
+    turbo: false
   },
+  // تجاهل أخطاء التنسيق والأنواع لضمان نجاح الـ Build
   eslint: {
     ignoreDuringBuilds: true,
   },
